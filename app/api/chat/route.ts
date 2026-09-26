@@ -51,11 +51,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ reply, currentPrinciple });
   } catch (err) {
     const message = err instanceof Error ? err.message : "알 수 없는 오류";
-    // 키 미설정 등은 500으로, 메시지는 서버 로그 용도
     console.error("[/api/chat]", message);
-    return NextResponse.json(
-      { error: "응답 생성 중 문제가 발생했습니다. 잠시 후 다시 시도하세요." },
-      { status: 500 },
-    );
+
+    // OpenAI 오류 상태별 안내 (개발/운영 중 원인 파악용)
+    const status =
+      typeof (err as { status?: number })?.status === "number"
+        ? (err as { status: number }).status
+        : 500;
+
+    let userMessage = "응답 생성 중 문제가 발생했습니다. 잠시 후 다시 시도하세요.";
+    if (status === 401) userMessage = "OpenAI 인증 오류입니다. API 키를 확인하세요.";
+    else if (status === 429)
+      userMessage =
+        message.includes("credit") || message.includes("quota")
+          ? "OpenAI 크레딧이 부족합니다. 결제/크레딧을 확인하세요."
+          : "요청이 많습니다. 잠시 후 다시 시도하세요.";
+
+    return NextResponse.json({ error: userMessage }, { status: 502 });
   }
 }
