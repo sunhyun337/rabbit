@@ -15,8 +15,8 @@ _최종 갱신: 2026-09-26_
 - [x] OpenAI 키 설정 + 크레딧 충전 (로컬 `.env.local`)
 - [x] **Phase 2: 설계원리 기반 대화 엔진 — 로컬에서 end-to-end 작동 확인** ✅
 - [x] **Phase 3: 음성(STT/TTS) — API·UI 구현, 엔드포인트 검증** ✅ (마이크 UX는 실제 브라우저에서)
+- [x] **Vercel 배포 완료** ✅ → https://rabbit-sunhyun1.vercel.app (프로덕션 대화 작동 확인, 자동배포 연동)
 - [ ] Supabase 프로젝트 & 인증 + 기록 저장 (사용자 키 필요)
-- [ ] Vercel 배포 (환경변수 등록 + GitHub 연동)
 
 ## Phase 진행
 - **Phase 0 (셋업)**: 도구·git·푸시 완료. 외부 서비스(OpenAI/Supabase/Vercel) 키 연동 대기.
