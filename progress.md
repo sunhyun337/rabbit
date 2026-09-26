@@ -12,15 +12,17 @@ _최종 갱신: 2026-09-26_
 - [x] git 저장소 초기화 (`main`)
 - [x] Next.js 스켈레톤 + 로컬 빌드 (Next 15.5.26, build 통과)
 - [x] GitHub 원격 연결 & 첫 푸시 (`sunhyun337/rabbit`)
-- [ ] Phase 2: 설계원리 기반 대화 엔진 (진행 중)
-- [ ] Vercel 연동 (사용자 작업 필요)
-- [ ] Supabase 프로젝트 & 스키마 (사용자 키 필요)
-- [ ] OpenAI 키 설정 (사용자 키 필요)
+- [x] OpenAI 키 설정 + 크레딧 충전 (로컬 `.env.local`)
+- [x] **Phase 2: 설계원리 기반 대화 엔진 — 로컬에서 end-to-end 작동 확인** ✅
+- [ ] Phase 3: 음성(STT/TTS) 병행
+- [ ] Supabase 프로젝트 & 인증 + 기록 저장 (사용자 키 필요)
+- [ ] Vercel 배포 (환경변수 등록 + GitHub 연동)
 
 ## Phase 진행
 - **Phase 0 (셋업)**: 도구·git·푸시 완료. 외부 서비스(OpenAI/Supabase/Vercel) 키 연동 대기.
 - **Phase 1 (뼈대·인증)**: Next.js 스켈레톤 완료. Supabase Auth는 키 확보 후.
-- **Phase 2 (대화 엔진)**: 진행 중 — 설계원리 파싱 → 프롬프트 생성 → `/api/chat` → 대화 UI.
+- **Phase 2 (대화 엔진)**: 완료 — 설계원리 파싱 → 프롬프트 생성 → `/api/chat` → 대화 UI, 로컬 검증 완료.
+- **Phase 3~ (음성/인증/배포)**: 대기.
 
 ## 사용자 조치 필요 (Blocking)
 1. ~~GitHub 푸시 인증~~ ✅ 완료 (sunhyun337)
