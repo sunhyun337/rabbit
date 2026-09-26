@@ -14,7 +14,7 @@ _최종 갱신: 2026-09-26_
 - [x] GitHub 원격 연결 & 첫 푸시 (`sunhyun337/rabbit`)
 - [x] OpenAI 키 설정 + 크레딧 충전 (로컬 `.env.local`)
 - [x] **Phase 2: 설계원리 기반 대화 엔진 — 로컬에서 end-to-end 작동 확인** ✅
-- [ ] Phase 3: 음성(STT/TTS) 병행
+- [x] **Phase 3: 음성(STT/TTS) — API·UI 구현, 엔드포인트 검증** ✅ (마이크 UX는 실제 브라우저에서)
 - [ ] Supabase 프로젝트 & 인증 + 기록 저장 (사용자 키 필요)
 - [ ] Vercel 배포 (환경변수 등록 + GitHub 연동)
 
@@ -22,7 +22,13 @@ _최종 갱신: 2026-09-26_
 - **Phase 0 (셋업)**: 도구·git·푸시 완료. 외부 서비스(OpenAI/Supabase/Vercel) 키 연동 대기.
 - **Phase 1 (뼈대·인증)**: Next.js 스켈레톤 완료. Supabase Auth는 키 확보 후.
 - **Phase 2 (대화 엔진)**: 완료 — 설계원리 파싱 → 프롬프트 생성 → `/api/chat` → 대화 UI, 로컬 검증 완료.
-- **Phase 3~ (음성/인증/배포)**: 대기.
+- **Phase 3 (음성)**: 완료 — `/api/tts`(mp3), `/api/stt`(Whisper), 마이크 녹음 + 음성 재생 UI. curl 왕복 검증.
+- **다음 (인증/배포)**: Supabase 로그인·기록 저장, Vercel 배포. 둘 다 사용자 계정/키 필요.
+
+## 알려진 이슈 / 메모
+- 배포(Vercel) 시 `설계원리.md`를 서버 런타임에서 fs로 읽음 → 서버리스 번들에 포함되는지 확인 필요(파일 트레이싱).
+- TTS 기본 음성 `alloy`의 한국어 발음 품질 점검 필요(필요 시 voice/model 조정).
+- 음성 자동재생은 브라우저 정책상 사용자 상호작용 후 허용(실패 시 텍스트로 폴백, 조용히 무시).
 
 ## 사용자 조치 필요 (Blocking)
 1. ~~GitHub 푸시 인증~~ ✅ 완료 (sunhyun337)

@@ -175,3 +175,40 @@ a {
   opacity: 0.5;
   cursor: default;
 }
+
+.mic-btn {
+  background: #fff !important;
+  color: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  white-space: nowrap;
+}
+
+.mic-btn.recording {
+  background: #c0392b !important;
+  color: #fff !important;
+  border-color: #c0392b !important;
+  animation: pulse 1.1s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.speak-toggle {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  opacity: 0.5;
+}
+
+.speak-toggle.on {
+  opacity: 1;
+}
