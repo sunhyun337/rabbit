@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenAI, CHAT_MODEL, MAX_OUTPUT_TOKENS } from "@/lib/openai/client";
+import { getChatClient, MAX_OUTPUT_TOKENS } from "@/lib/openai/client";
 import { buildSystemPrompt } from "@/lib/prompt/systemPrompt";
 import { PRINCIPLE_COUNT } from "@/lib/prompt/principles";
 
@@ -16,6 +16,14 @@ interface ChatRequestBody {
   currentPrinciple?: number;
 }
 
+/** 피드백에서 질문(물음표로 끝나는 문장)을 제거한다. 전부 질문이면 원문을 돌려준다. */
+function stripQuestions(text: string): string {
+  const parts = text.split(/(?<=[.!?…])\s+/);
+  const kept = parts.filter((s) => !/[?？]\s*$/.test(s.trim()));
+  const out = kept.join(" ").trim();
+  return out || text;
+}
+
 export async function POST(req: NextRequest) {
   let body: ChatRequestBody;
   try {
@@ -25,6 +33,9 @@ export async function POST(req: NextRequest) {
   }
 
   const messages = Array.isArray(body.messages) ? body.messages : [];
+
+  // 질문은 화면의 단계 버튼이 제공하므로, 서버는 '현재 단계 관점의 피드백'만 생성한다.
+  // currentPrinciple = 학습자가 지금 답하고 있는 단계(1~6).
   const currentPrinciple = Math.min(
     Math.max(Number(body.currentPrinciple) || 1, 1),
     PRINCIPLE_COUNT,
@@ -35,19 +46,21 @@ export async function POST(req: NextRequest) {
 
   try {
     const systemPrompt = buildSystemPrompt({ currentPrinciple });
-    const openai = getOpenAI();
+    const { client, model } = getChatClient();
 
-    const completion = await openai.chat.completions.create({
-      model: CHAT_MODEL,
+    const completion = await client.chat.completions.create({
+      model,
       max_tokens: MAX_OUTPUT_TOKENS,
-      temperature: 0.7,
+      temperature: 0.4,
       messages: [
         { role: "system", content: systemPrompt },
         ...recent.map((m) => ({ role: m.role, content: m.content })),
       ],
     });
 
-    const reply = completion.choices[0]?.message?.content?.trim() ?? "";
+    const raw = completion.choices[0]?.message?.content?.trim() ?? "";
+    // 질문은 화면의 단계 버튼이 담당하므로, 피드백에서 '물음표로 끝나는 문장'은 제거한다.
+    const reply = stripQuestions(raw);
     return NextResponse.json({ reply, currentPrinciple });
   } catch (err) {
     const message = err instanceof Error ? err.message : "알 수 없는 오류";
@@ -60,11 +73,11 @@ export async function POST(req: NextRequest) {
         : 500;
 
     let userMessage = "응답 생성 중 문제가 발생했습니다. 잠시 후 다시 시도하세요.";
-    if (status === 401) userMessage = "OpenAI 인증 오류입니다. API 키를 확인하세요.";
+    if (status === 401) userMessage = "AI 인증 오류입니다. API 키를 확인하세요.";
     else if (status === 429)
       userMessage =
         message.includes("credit") || message.includes("quota")
-          ? "OpenAI 크레딧이 부족합니다. 결제/크레딧을 확인하세요."
+          ? "AI 사용 한도/크레딧이 부족합니다. 결제/크레딧을 확인하세요."
           : "요청이 많습니다. 잠시 후 다시 시도하세요.";
 
     return NextResponse.json({ error: userMessage }, { status: 502 });
