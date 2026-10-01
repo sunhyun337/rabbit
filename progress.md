@@ -16,7 +16,10 @@ _최종 갱신: 2026-09-26_
 - [x] **Phase 2: 설계원리 기반 대화 엔진 — 로컬에서 end-to-end 작동 확인** ✅
 - [x] **Phase 3: 음성(STT/TTS) — API·UI 구현, 엔드포인트 검증** ✅ (마이크 UX는 실제 브라우저에서)
 - [x] **Vercel 배포 완료** ✅ → https://rabbit-sunhyun1.vercel.app (프로덕션 대화 작동 확인, 자동배포 연동)
-- [ ] Supabase 프로젝트 & 인증 + 기록 저장 (사용자 키 필요)
+- [x] **홈: 『토끼전』 주요 장면 5개** 소개 + **챗봇을 홈 오른쪽 패널로** 배치(2단 레이아웃) ✅
+- [x] **게임: 「두루마리 여정」 횡스크롤 플랫포머** — 토끼가 달리며 장면 5개(두루마리) 수집, 각 장면 원문·어휘 대화창 ✅ (`/game`)
+- [x] **인증 UI(회원가입/로그인, 이메일+비밀번호)** + 미들웨어 게이팅(`/chat`,`/game`) 구현 ✅ — **Supabase 키 설정 시 활성화**(현재는 키 없음 → 게이팅 미적용, 앱 정상 동작)
+- [ ] Supabase 프로젝트 생성 + 키 입력(활성화) & 기록 저장(RLS) (사용자 키 필요)
 
 ## Phase 진행
 - **Phase 0 (셋업)**: 도구·git·푸시 완료. 외부 서비스(OpenAI/Supabase/Vercel) 키 연동 대기.
@@ -32,9 +35,11 @@ _최종 갱신: 2026-09-26_
 
 ## 사용자 조치 필요 (Blocking)
 1. ~~GitHub 푸시 인증~~ ✅ 완료 (sunhyun337)
-2. OpenAI API 키 발급 + 사용 한도 설정 → `.env.local`의 `OPENAI_API_KEY`
-3. Supabase 프로젝트 생성 → URL, anon key, service_role key
-4. Vercel 프로젝트 생성 + GitHub 연동
+2. ~~OpenAI API 키~~ ✅ 완료
+3. **Supabase 프로젝트 생성 → URL, anon key, service_role key** 를 `.env.local`(+Vercel 환경변수)에 입력
+   → 입력하면 회원가입/로그인이 실제로 작동하고, `/chat`·`/game`이 로그인 사용자 전용으로 게이팅됨.
+   (Supabase 대시보드 > Authentication > Providers > Email 활성화. 빠른 테스트는 "Confirm email" 끄기)
+4. ~~Vercel 프로젝트 생성 + GitHub 연동~~ ✅ 완료
 
 ## 열린 질문 (기본값으로 진행 중, 변경 가능)
 - 대화 모델: 개발 `gpt-4o-mini` / 실사용 `gpt-4o`

@@ -21,3 +21,27 @@ export function getOpenAI(): OpenAI {
 
 export const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
 export const MAX_OUTPUT_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS || 500);
+
+/**
+ * 대화(Chat)용 클라이언트와 모델을 반환한다.
+ * AI_PROVIDER=upstage 이면 Upstage Solar(OpenAI 호환 API)를 사용한다.
+ * (음성 STT/TTS는 Upstage가 제공하지 않으므로 OpenAI를 그대로 사용 — getOpenAI)
+ */
+let chatClient: OpenAI | null = null;
+
+export function getChatClient(): { client: OpenAI; model: string; provider: string } {
+  const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
+
+  if (provider === "upstage") {
+    const apiKey = (process.env.UPSTAGE_API_KEY || "").replace(/[^\x21-\x7E]/g, "");
+    if (!apiKey) {
+      throw new Error("UPSTAGE_API_KEY가 설정되지 않았습니다. .env.local을 확인하세요.");
+    }
+    const baseURL = process.env.UPSTAGE_BASE_URL || "https://api.upstage.ai/v1";
+    const model = process.env.UPSTAGE_CHAT_MODEL || "solar-pro2";
+    if (!chatClient) chatClient = new OpenAI({ apiKey, baseURL });
+    return { client: chatClient, model, provider };
+  }
+
+  return { client: getOpenAI(), model: CHAT_MODEL, provider: "openai" };
+}
