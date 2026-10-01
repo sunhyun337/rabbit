@@ -23,17 +23,21 @@ interface Props {
 }
 
 export default function ChatPanel({ variant = "page", authed = true }: Props) {
-  const [messages, setMessages] = useState<Message[]>([GREETING]);
+  // 대화 페이지(/chat)는 인사말 없이 단계 버튼만 보여 준다. 홈 오른쪽 패널은 환영 인사 유지.
+  const [messages, setMessages] = useState<Message[]>(
+    variant === "side" ? [GREETING] : [],
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [currentPrinciple, setCurrentPrinciple] = useState(1);
   const [done, setDone] = useState(false);
 
-  // 단계(설계원리 1~6) 진행 상태 — 학습자는 버튼을 '순서대로' 누른다.
-  const [unlocked, setUnlocked] = useState(1); // 지금 누를 수 있는 단계
+  // 단계(설계원리 1~6) 진행 상태 — 학습자가 '원하는 단계'를 자유롭게 고른다.
+  const [completed, setCompleted] = useState<number[]>([]); // 마친 단계들(✓ 표시용)
+  const completedRef = useRef<number[]>([]);
   const [activeStage, setActiveStage] = useState(0); // 진행 중 단계(0=대기)
   const activeStageRef = useRef(0);
-  const qIdxRef = useRef(0); // 진행 중 단계에서 답한 질문 수(0→1→2)
+  const qIdxRef = useRef(0); // 진행 중 단계에서 답한 질문 수
 
   const [speakOn, setSpeakOn] = useState(true);
   const [recording, setRecording] = useState(false);
@@ -121,10 +125,10 @@ export default function ChatPanel({ variant = "page", authed = true }: Props) {
     scrollToBottom();
   }
 
-  // 단계 버튼 클릭 → 해당 단계의 첫 질문을 던진다(순서대로만 가능).
+  // 단계 버튼 클릭 → 해당 단계의 첫 질문을 던진다(원하는 단계 자유 선택).
   function startStage(n: number) {
-    if (loading || !authed || done) return;
-    if (n !== unlocked || activeStageRef.current !== 0) return;
+    if (loading || !authed) return;
+    if (activeStageRef.current !== 0) return; // 진행 중인 단계가 있으면 먼저 답하기
     activeStageRef.current = n;
     qIdxRef.current = 0;
     setActiveStage(n);
@@ -136,28 +140,30 @@ export default function ChatPanel({ variant = "page", authed = true }: Props) {
   function advanceAfterAnswer() {
     const s = activeStageRef.current;
     if (s === 0) return; // 자유 입력 — 단계 제어 없음
-    const answered = qIdxRef.current + 1; // 방금 답한 질문 번호(1 또는 2)
+    const qs = STAGE_QUESTIONS[s - 1].questions;
+    const answered = qIdxRef.current + 1; // 방금 답한 질문 번호
     qIdxRef.current = answered;
-    if (answered < 2) {
-      setTimeout(() => askQuestion(STAGE_QUESTIONS[s - 1].questions[1]), 700);
+    if (answered < qs.length) {
+      setTimeout(() => askQuestion(qs[answered]), 700);
       return;
     }
-    // 이 단계의 질문 2개 완료
+    // 이 단계의 질문을 모두 완료
     activeStageRef.current = 0;
     setActiveStage(0);
-    if (s < 6) {
-      setUnlocked(s + 1);
-      setTimeout(
-        () => injectInfo(`좋아요! 이제 '${s + 1}단계' 버튼을 눌러 계속해 보세요.`),
-        700,
-      );
-    } else {
-      setDone(true);
-      setTimeout(
-        () => injectInfo("6단계를 모두 마쳤어요. 오늘 말하기 연습, 정말 잘했어요! 🎉"),
-        700,
-      );
+    if (!completedRef.current.includes(s)) {
+      completedRef.current = [...completedRef.current, s];
+      setCompleted(completedRef.current);
     }
+    const allDone = completedRef.current.length >= STAGE_QUESTIONS.length;
+    setTimeout(
+      () =>
+        injectInfo(
+          allDone
+            ? "모든 단계를 마쳤어요. 정말 잘했어요! 🎉 다시 연습하고 싶은 단계를 눌러도 좋아요."
+            : `좋아요! '${s}단계'를 마쳤어요. 원하는 다른 단계를 눌러 계속해 보세요.`,
+        ),
+      700,
+    );
   }
 
   async function startRecording() {
@@ -249,21 +255,18 @@ export default function ChatPanel({ variant = "page", authed = true }: Props) {
           </div>
         )}
 
-        {!done && (
+        {!done && variant !== "side" && (
           <div className="stage-steps">
             <p className="stage-steps-lead">
-              아래 <b>단계 버튼을 순서대로</b> 눌러 말하기를 연습해요. (단계마다 질문 2개)
+              <b>원하는 단계 버튼</b>을 눌러 말하기를 연습해요. 어느 단계부터
+              시작해도 좋아요. (단계마다 질문 5개)
             </p>
             <div className="stage-steps-row">
               {STAGE_QUESTIONS.map((s) => {
-                const state =
-                  s.no < unlocked
-                    ? "done"
-                    : s.no === unlocked
-                      ? "current"
-                      : "locked";
-                const clickable =
-                  state === "current" && activeStage === 0 && !loading && authed;
+                const isActive = activeStage === s.no;
+                const isDone = completed.includes(s.no);
+                const state = isActive ? "current" : isDone ? "done" : "";
+                const clickable = activeStage === 0 && !loading && authed;
                 return (
                   <button
                     key={s.no}
@@ -274,7 +277,7 @@ export default function ChatPanel({ variant = "page", authed = true }: Props) {
                   >
                     <span className="stage-step-no">{s.no}단계</span>
                     <span className="stage-step-name">
-                      {state === "done" ? "✓ " : ""}
+                      {isDone ? "✓ " : ""}
                       {s.short}
                     </span>
                   </button>
