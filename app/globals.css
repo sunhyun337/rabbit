@@ -204,15 +204,13 @@ a {
   cursor: pointer;
 }
 
-/* ===== 홈 2단 레이아웃 (좌: 소개 / 우: 챗봇) ===== */
+/* ===== 홈 레이아웃 (소개 1단) ===== */
 .home {
-  max-width: 1180px;
+  max-width: 880px;
   margin: 0 auto;
   padding: 16px 20px 20px;
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 20px;
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
   min-height: calc(100dvh - 56px);
   box-sizing: border-box;
 }
@@ -567,6 +565,13 @@ a {
 }
 
 .story-art svg {
+  display: block;
+}
+
+.story-art .story-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
 
@@ -2203,4 +2208,26 @@ button.btn {
   margin: 0 0 6px;
   color: #b4603c;
   font-weight: 800;
+}
+
+/* ===== 히어로 이미지 (액자형 프레임) ===== */
+.hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+.hero-card {
+  border-color: rgba(99, 102, 241, 0.28);
+  box-shadow: 0 0 50px rgba(99, 102, 241, 0.18),
+    0 14px 36px -12px rgba(60, 90, 70, 0.28);
+}
+.hero-card:hover .hero-img {
+  transform: scale(1.04);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-img {
+    transition: none;
+  }
 }
