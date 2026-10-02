@@ -183,22 +183,29 @@ export function normalizeAnswer(s: string): string {
 
 import type { ItemId } from "./items";
 
-export interface Chest {
-  threshold: number; // 이 점수 이상이면 열 수 있음
+export interface ChestBand {
+  min: number; // 이 점수 이상이면 이 상자 구간
   item: ItemId; // 상자 속 게임 아이템
+  range: string; // 표시용 점수대
 }
 
 /**
- * 포인트로 여는 보물상자 5개 (점수가 높을수록 더 좋은 아이템).
- * 상자를 열면 그 안의 '게임 아이템'을 획득 → 게임에서 장착해 사용한다.
+ * 최종 점수대에 따라 '한 개'의 보물상자(아이템)를 연다.
+ * 점수가 높을수록 더 좋은 아이템을 얻는다. (내림차순 정렬)
  */
-export const CHESTS: Chest[] = [
-  { threshold: 40, item: "wind" },
-  { threshold: 80, item: "carrot" },
-  { threshold: 120, item: "shield" },
-  { threshold: 160, item: "wings" },
-  { threshold: 190, item: "star" },
+export const CHEST_BANDS: ChestBand[] = [
+  { min: 190, item: "star", range: "190점 이상" },
+  { min: 160, item: "wings", range: "160–189점" },
+  { min: 130, item: "shield", range: "130–159점" },
+  { min: 100, item: "carrot", range: "100–129점" },
+  { min: 60, item: "wind", range: "60–99점" },
 ];
 
-export const POINTS_FIRST_TRY = 10; // 한 번에 맞히면
-export const POINTS_RETRY = 5; // 틀린 뒤 맞히면
+/** 점수에 맞는 보물상자 구간(60점 미만이면 null) */
+export function rewardBand(points: number): ChestBand | null {
+  return CHEST_BANDS.find((b) => points >= b.min) ?? null;
+}
+
+export const POINTS_FIRST_TRY = 10; // 1번째 시도에 정답
+export const POINTS_SECOND_TRY = 5; // 2번째 시도에 정답
+export const PENALTY_WRONG = 5; // 객관식에서 3번째도 틀리면 감점
