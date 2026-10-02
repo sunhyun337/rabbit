@@ -125,10 +125,10 @@ export default function ChatPanel({ variant = "page", authed = true }: Props) {
     scrollToBottom();
   }
 
-  // 단계 버튼 클릭 → 해당 단계의 첫 질문을 던진다(원하는 단계 자유 선택).
+  // 단계 버튼 클릭 → 해당 단계의 첫 질문을 던진다(진행 중이어도 자유롭게 전환).
   function startStage(n: number) {
     if (loading || !authed) return;
-    if (activeStageRef.current !== 0) return; // 진행 중인 단계가 있으면 먼저 답하기
+    if (activeStageRef.current === n) return; // 이미 진행 중인 단계면 그대로
     activeStageRef.current = n;
     qIdxRef.current = 0;
     setActiveStage(n);
@@ -266,7 +266,7 @@ export default function ChatPanel({ variant = "page", authed = true }: Props) {
                 const isActive = activeStage === s.no;
                 const isDone = completed.includes(s.no);
                 const state = isActive ? "current" : isDone ? "done" : "";
-                const clickable = activeStage === 0 && !loading && authed;
+                const clickable = !loading && authed && !isActive;
                 return (
                   <button
                     key={s.no}
