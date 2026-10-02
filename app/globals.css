@@ -1995,3 +1995,182 @@ button.btn {
   padding: 28px 12px;
   line-height: 1.6;
 }
+
+/* ===== 게임: 아이템 장착 ===== */
+.game-items {
+  margin: 6px 0 14px;
+  text-align: left;
+}
+.game-items-lead {
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin: 0 0 8px;
+}
+.game-items-hint {
+  font-weight: 500;
+  color: #999;
+}
+.game-items-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.game-item {
+  flex: 1 1 0;
+  min-width: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+.game-item:not(:disabled):hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.game-item.on {
+  border-color: #e0a83c;
+  background: #fff6df;
+  box-shadow: 0 4px 14px rgba(224, 168, 60, 0.3);
+}
+.game-item.locked {
+  opacity: 0.45;
+  cursor: default;
+}
+.game-item-icon {
+  font-size: 1.5rem;
+}
+.game-item-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+.game-item-desc {
+  font-size: 0.68rem;
+  color: #777;
+  text-align: center;
+  line-height: 1.25;
+}
+
+/* ===== 다른 나라 이야기 ===== */
+.world-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px 20px 44px;
+  box-sizing: border-box;
+}
+.world-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.world-lead {
+  color: #555;
+  margin: 14px 2px;
+}
+.world-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .world-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.world-country {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+}
+.world-country:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.world-country.active {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(60, 90, 70, 0.15);
+}
+.world-flag {
+  font-size: 1.7rem;
+}
+.world-name {
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-align: center;
+}
+.world-tale {
+  margin-top: 18px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(60, 90, 70, 0.08);
+}
+.world-tale-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+.world-tale-top h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+.world-listen {
+  flex: none;
+  border: 1.5px solid var(--accent);
+  background: var(--accent-weak);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.world-listen:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.world-tale-country {
+  color: #999;
+  font-size: 0.85rem;
+  margin: 2px 0 14px;
+}
+.world-para {
+  line-height: 1.75;
+  margin: 0 0 12px;
+}
+.world-lesson {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  background: var(--accent-weak);
+  border-radius: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.world-empty {
+  margin-top: 24px;
+  text-align: center;
+  color: #888;
+  padding: 24px 12px;
+}

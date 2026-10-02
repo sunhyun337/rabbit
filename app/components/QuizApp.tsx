@@ -9,6 +9,7 @@ import {
   normalizeAnswer,
   type QuizQuestion,
 } from "@/lib/story/quizSets";
+import { getItem, addEarnedItem, type ItemId } from "@/lib/story/items";
 
 interface Prepared {
   base: QuizQuestion;
@@ -78,6 +79,12 @@ export default function QuizApp() {
     setPhase("playing");
   }
 
+  // 보물상자 열기 → 아이템 획득(localStorage 저장) → 게임에서 장착 가능
+  function openChest(item: ItemId) {
+    setOpenedChests((o) => (o.includes(item) ? o : [...o, item]));
+    addEarnedItem(item);
+  }
+
   function awardAndSolve() {
     setPoints((p) => p + (triedWrong ? POINTS_RETRY : POINTS_FIRST_TRY));
     setCorrectCount((c) => c + 1);
@@ -143,16 +150,20 @@ export default function QuizApp() {
           </p>
           <ul className="quiz-intro-points">
             <li>⭐ 한 번에 맞히면 +{POINTS_FIRST_TRY}점, 다시 맞히면 +{POINTS_RETRY}점</li>
-            <li>🎁 모은 점수로 보물상자를 열 수 있어요 (점수가 높을수록 좋은 상자!)</li>
+            <li>🎁 모은 점수로 보물상자를 열면 <b>게임 아이템</b>을 얻어요!</li>
+            <li>🎮 얻은 아이템을 게임에서 장착하면 토끼가 더 강해져요</li>
           </ul>
           <div className="quiz-chests preview">
-            {CHESTS.map((c) => (
-              <div key={c.key} className="quiz-chest locked">
-                <span className="quiz-chest-icon">{c.icon}</span>
-                <span className="quiz-chest-name">{c.name}</span>
-                <span className="quiz-chest-th">{c.threshold}점</span>
-              </div>
-            ))}
+            {CHESTS.map((c) => {
+              const it = getItem(c.item)!;
+              return (
+                <div key={c.item} className="quiz-chest locked">
+                  <span className="quiz-chest-icon">{it.icon}</span>
+                  <span className="quiz-chest-name">{it.name}</span>
+                  <span className="quiz-chest-th">{c.threshold}점</span>
+                </div>
+              );
+            })}
           </div>
           <button className="btn big" onClick={start}>
             퀴즈 시작하기
@@ -164,7 +175,8 @@ export default function QuizApp() {
 
   // ===== 결과 화면 =====
   if (phase === "result") {
-    const stars = points >= 180 ? 3 : points >= 120 ? 2 : points >= 60 ? 1 : 0;
+    const unlockedCount = CHESTS.filter((c) => points >= c.threshold).length;
+    const stars = unlockedCount; // 0~5 (열 수 있는 상자 수)
     return (
       <div className="quiz-wrap">
         <QuizHeader points={points} />
@@ -174,26 +186,29 @@ export default function QuizApp() {
           <p className="quiz-result-score">
             {ALL_QUIZ.length}문제 중 <b>{correctCount}</b>개 정답 · <b>{points}</b>점
           </p>
-          <p className="quiz-result-sub">모은 점수로 보물상자를 열어 보세요!</p>
+          <p className="quiz-result-sub">
+            보물상자를 열어 <b>게임 아이템</b>을 얻으세요! (게임에서 장착할 수 있어요)
+          </p>
           <div className="quiz-chests">
             {CHESTS.map((c) => {
+              const it = getItem(c.item)!;
               const unlocked = points >= c.threshold;
-              const opened = openedChests.includes(c.key);
+              const opened = openedChests.includes(c.item);
               return (
                 <button
-                  key={c.key}
+                  key={c.item}
                   className={`quiz-chest ${unlocked ? "unlocked" : "locked"} ${opened ? "opened" : ""}`}
                   disabled={!unlocked || opened}
-                  onClick={() => setOpenedChests((o) => [...o, c.key])}
+                  onClick={() => openChest(c.item)}
                 >
                   <span className="quiz-chest-icon">
-                    {opened ? "🎉" : unlocked ? "🎁" : "🔒"}
+                    {opened ? it.icon : unlocked ? "🎁" : "🔒"}
                   </span>
                   <span className="quiz-chest-name">
-                    {c.icon} {c.name}
+                    {opened ? `${it.icon} ${it.name}` : "보물상자"}
                   </span>
                   {opened ? (
-                    <span className="quiz-chest-reward">{c.reward}</span>
+                    <span className="quiz-chest-reward">{it.desc}</span>
                   ) : (
                     <span className="quiz-chest-th">
                       {unlocked ? "눌러서 열기!" : `${c.threshold}점 필요`}
@@ -207,6 +222,9 @@ export default function QuizApp() {
             <button className="btn big" onClick={start}>
               다시 풀기
             </button>
+            <a className="btn big" href="/game">
+              🎮 게임에서 쓰기
+            </a>
             <a className="btn ghost big" href="/">
               홈으로
             </a>
@@ -332,7 +350,7 @@ function QuizHeader({
   nextChest,
 }: {
   points: number;
-  nextChest?: { threshold: number; name: string } | undefined;
+  nextChest?: { threshold: number } | undefined;
 }) {
   return (
     <header className="quiz-header">

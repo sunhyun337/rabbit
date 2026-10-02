@@ -181,19 +181,23 @@ export function normalizeAnswer(s: string): string {
   return s.replace(/\s+/g, "").trim();
 }
 
+import type { ItemId } from "./items";
+
 export interface Chest {
-  key: string;
   threshold: number; // 이 점수 이상이면 열 수 있음
-  icon: string;
-  name: string;
-  reward: string; // 열었을 때 나오는 보물
+  item: ItemId; // 상자 속 게임 아이템
 }
 
-/** 포인트로 여는 보물상자 (점수가 높을수록 더 좋은 상자) */
+/**
+ * 포인트로 여는 보물상자 5개 (점수가 높을수록 더 좋은 아이템).
+ * 상자를 열면 그 안의 '게임 아이템'을 획득 → 게임에서 장착해 사용한다.
+ */
 export const CHESTS: Chest[] = [
-  { key: "bronze", threshold: 60, icon: "🥉", name: "동 상자", reward: "🫧 용궁의 진주" },
-  { key: "silver", threshold: 120, icon: "🥈", name: "은 상자", reward: "🛡️ 자라 등딱지 방패" },
-  { key: "gold", threshold: 180, icon: "🥇", name: "금 상자", reward: "💊 지혜의 간(명약)" },
+  { threshold: 40, item: "wind" },
+  { threshold: 80, item: "carrot" },
+  { threshold: 120, item: "shield" },
+  { threshold: 160, item: "wings" },
+  { threshold: 190, item: "star" },
 ];
 
 export const POINTS_FIRST_TRY = 10; // 한 번에 맞히면

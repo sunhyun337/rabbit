@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QUIZ, type QuizItem } from "@/lib/story/quiz";
+import { ITEMS, getEarnedItems, type ItemId } from "@/lib/story/items";
 
 /**
  * 『토끼전』 경주 — 토끼(플레이어) vs 자라(AI). 의인화·회화풍.
@@ -116,12 +117,47 @@ export default function GamePage() {
   const tMarkRef = useRef<HTMLDivElement>(null);
   const speedRef = useRef<HTMLSpanElement>(null);
 
+  // ===== 퀴즈에서 얻은 아이템 ↔ 게임 연계 =====
+  const [earned, setEarned] = useState<ItemId[]>([]);
+  const [equipped, setEquipped] = useState<ItemId[]>([]);
+  const equippedRef = useRef<ItemId[]>([]);
+  const jumpMul = useRef(1);
+  const accelMul = useRef(1);
+  const slowImmune = useRef(false);
+
+  useEffect(() => {
+    setEarned(getEarnedItems());
+  }, []);
+  useEffect(() => {
+    equippedRef.current = equipped;
+  }, [equipped]);
+
+  const toggleEquip = (id: ItemId) =>
+    setEquipped((cur) =>
+      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
+    );
+
   const resetGame = useCallback(() => {
     player.current = { x: 40, y: GROUND_Y - PH, vx: 0, vy: 0, onGround: true, face: 1, anim: 0 };
     prevX.current = 40;
     turtleX.current = 60;
     turtleMul.current = 1;
     speedMul.current = 1;
+    jumpMul.current = 1;
+    accelMul.current = 1;
+    slowImmune.current = false;
+    // 장착한 아이템 효과 적용(중첩 가능)
+    {
+      const eq = new Set(equippedRef.current);
+      if (eq.has("wings")) speedMul.current *= 1.3; // 날개: 속도 UP
+      if (eq.has("wind")) {
+        speedMul.current *= 1.1;
+        accelMul.current *= 1.8; // 바람 부적: 가속 UP
+      }
+      if (eq.has("carrot")) jumpMul.current *= 1.28; // 황금 당근: 점프 UP
+      if (eq.has("shield")) slowImmune.current = true; // 등딱지 방패: 감속 면역
+      if (eq.has("star")) turtleMul.current *= 0.8; // 행운의 별: 자라 느려짐
+    }
     slowTimer.current = 0;
     obstaclesRef.current = OB_DEFS.map((o) => ({ ...o, cleared: false }));
     fireflies.current = PLATFORMS.map((p) => ({ x: p.x + p.w / 2, y: p.y - 22, taken: false }));
@@ -229,7 +265,7 @@ export default function GamePage() {
       const p = player.current;
       const inSea = p.x >= SEA_START && p.x < SEA_END;
       const grav = inSea ? 0.4 : 0.72;
-      const jumpV = inSea ? -10.6 : -13.2;
+      const jumpV = (inSea ? -10.6 : -13.2) * jumpMul.current;
 
       const left = keys.current["ArrowLeft"] || keys.current["a"];
       const right = keys.current["ArrowRight"] || keys.current["d"];
@@ -243,13 +279,15 @@ export default function GamePage() {
             inPuddle = true;
             break;
           }
-      const maxRun =
-        RUN * speedMul.current * (slowTimer.current > 0 ? 0.5 : 1) * (inPuddle ? 0.5 : 1);
+      const slowed = slowTimer.current > 0 && !slowImmune.current;
+      const puddleSlow = inPuddle && !slowImmune.current;
+      const maxRun = RUN * speedMul.current * (slowed ? 0.5 : 1) * (puddleSlow ? 0.5 : 1);
+      const acc = ACCEL * accelMul.current;
       if (right && !left) {
-        p.vx = Math.min(maxRun, p.vx + ACCEL);
+        p.vx = Math.min(maxRun, p.vx + acc);
         p.face = 1;
       } else if (left && !right) {
-        p.vx = Math.max(-maxRun * 0.7, p.vx - ACCEL);
+        p.vx = Math.max(-maxRun * 0.7, p.vx - acc);
         p.face = -1;
       } else {
         p.vx *= 0.8;
@@ -529,6 +567,7 @@ export default function GamePage() {
 
       drawGoal(ctx, GOAL);
       drawTurtleMan(ctx, turtleX.current, t, 0);
+      drawEquip(ctx, player.current);
       drawRabbitGirl(ctx, player.current);
 
       ctx.restore();
@@ -917,6 +956,47 @@ export default function GamePage() {
     }
   }
 
+  // 장착 아이템 시각 효과(토끼 뒤/주변)
+  function drawEquip(
+    c: CanvasRenderingContext2D,
+    p: { x: number; y: number },
+  ) {
+    const eq = new Set(equippedRef.current);
+    const x = p.x + PW / 2;
+    const y = p.y;
+    if (eq.has("shield")) {
+      c.save();
+      c.strokeStyle = "rgba(90,180,255,0.6)";
+      c.lineWidth = 2.5;
+      c.beginPath();
+      c.arc(x, y + 16, 26, 0, Math.PI * 2);
+      c.stroke();
+      c.restore();
+    }
+    if (eq.has("wings")) {
+      const flap = Math.sin(tRef.current / 5) * 0.3;
+      c.save();
+      c.fillStyle = "rgba(255,255,255,0.95)";
+      c.strokeStyle = "#cdd6e2";
+      c.lineWidth = 1;
+      for (const s of [-1, 1]) {
+        c.beginPath();
+        c.ellipse(x + s * 13, y + 20, 7, 13, s * (0.6 + flap), 0, Math.PI * 2);
+        c.fill();
+        c.stroke();
+      }
+      c.restore();
+    }
+    if (eq.has("star")) {
+      c.save();
+      c.font = "14px system-ui";
+      c.textAlign = "center";
+      c.fillText("⭐", x, y - 24 + Math.sin(tRef.current / 8) * 2);
+      c.textAlign = "left";
+      c.restore();
+    }
+  }
+
   // 토끼: 분홍 한복 소녀 + 흰 토끼 귀
   function drawRabbitGirl(
     c: CanvasRenderingContext2D,
@@ -1074,6 +1154,40 @@ export default function GamePage() {
                 ← → 걷기 · <b>Space(또는 ↑) 점프</b>로 물웅덩이·작은 산·바위를 뛰어넘어요!
                 <br />장애물을 넘거나 반딧불을 주우면 살짝 빨라져요 ✨
               </p>
+
+              <div className="game-items">
+                <p className="game-items-lead">
+                  🎒 아이템 장착
+                  {earned.length === 0 && (
+                    <span className="game-items-hint">
+                      {" "}
+                      — 🧩 퀴즈 보물상자에서 아이템을 모아 보세요!
+                    </span>
+                  )}
+                </p>
+                <div className="game-items-row">
+                  {ITEMS.map((it) => {
+                    const owned = earned.includes(it.id);
+                    const on = equipped.includes(it.id);
+                    return (
+                      <button
+                        key={it.id}
+                        className={`game-item ${owned ? "" : "locked"} ${on ? "on" : ""}`}
+                        onClick={() => owned && toggleEquip(it.id)}
+                        disabled={!owned}
+                        title={owned ? it.desc : "퀴즈에서 획득"}
+                      >
+                        <span className="game-item-icon">{it.icon}</span>
+                        <span className="game-item-name">{it.name}</span>
+                        <span className="game-item-desc">
+                          {owned ? it.desc : "퀴즈에서 획득"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <button className="btn" onClick={startGame}>
                 출발! ▶
               </button>
