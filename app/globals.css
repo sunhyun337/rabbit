@@ -1945,3 +1945,53 @@ button.btn {
   justify-content: center;
   flex-wrap: wrap;
 }
+
+/* ===== 인물 인터뷰 ===== */
+.iv-chars {
+  display: flex;
+  gap: 10px;
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+.iv-char {
+  flex: 1 1 0;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+.iv-char:not(:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+.iv-char.active {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+  color: var(--accent);
+  box-shadow: 0 4px 12px rgba(60, 90, 70, 0.15);
+}
+.iv-char:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.iv-char-emoji {
+  font-size: 1.7rem;
+}
+.iv-char-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.iv-empty {
+  color: #888;
+  text-align: center;
+  padding: 28px 12px;
+  line-height: 1.6;
+}

@@ -289,9 +289,12 @@ export default async function Home() {
               </div>
 
               <div className="home-btns">
-                <StorySynopsis />
+                <StorySynopsis label="📖 줄거리" />
                 <a className="btn big" href="/chat">
-                  💬 대화하기
+                  💬 대화 연습
+                </a>
+                <a className="btn ghost big" href="/interview">
+                  🎙️ 인터뷰
                 </a>
                 <a className="btn ghost big" href="/quiz">
                   🧩 퀴즈
