@@ -1631,3 +1631,317 @@ button.btn {
   cursor: pointer;
   font-family: inherit;
 }
+
+/* ===== 퀴즈 ===== */
+.quiz-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 20px 40px;
+  box-sizing: border-box;
+}
+.quiz-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.quiz-back {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.quiz-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+.quiz-points {
+  margin-left: auto;
+  background: #fff6df;
+  color: #8a6d1b;
+  border: 1px solid #ecd9a6;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.quiz-points small {
+  font-weight: 500;
+  color: #a98f52;
+}
+
+/* 진행 바 */
+.quiz-progress {
+  height: 8px;
+  background: var(--accent-weak);
+  border-radius: 999px;
+  margin: 16px 0 10px;
+  overflow: hidden;
+}
+.quiz-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.quiz-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.quiz-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.quiz-badge.cat-word {
+  background: #e7f0ff;
+  color: #2d5bb0;
+}
+.quiz-badge.cat-content {
+  background: #eef7ea;
+  color: #3d7d5a;
+}
+.quiz-badge.type {
+  background: #f2efe7;
+  color: #776b4e;
+}
+.quiz-count {
+  margin-left: auto;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+/* 문제 카드 */
+.quiz-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(60, 90, 70, 0.08);
+}
+.quiz-q {
+  font-size: 1.12rem;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 0 0 18px;
+}
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.quiz-opt {
+  text-align: left;
+  padding: 13px 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.quiz-opt:not(:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+.quiz-opt.correct {
+  border-color: #3d9c63;
+  background: #e8f6ec;
+  color: #246b40;
+  font-weight: 700;
+}
+.quiz-opt.wrong {
+  border-color: #d98a8a;
+  background: #fbeaea;
+  color: #a33;
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+/* OX */
+.quiz-ox {
+  display: flex;
+  gap: 12px;
+}
+.quiz-ox-btn {
+  flex: 1;
+  padding: 22px 10px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.quiz-ox-btn:not(:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-weak);
+}
+.quiz-ox-btn.correct {
+  border-color: #3d9c63;
+  background: #e8f6ec;
+}
+.quiz-ox-btn.wrong {
+  border-color: #d98a8a;
+  background: #fbeaea;
+  opacity: 0.8;
+}
+
+/* 주관식 */
+.quiz-sa {
+  display: flex;
+  gap: 8px;
+}
+.quiz-sa-input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  font: inherit;
+}
+.quiz-sa-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.quiz-sa-input.wrong {
+  border-color: #d98a8a;
+  background: #fbeaea;
+}
+
+.quiz-retry {
+  margin: 14px 0 0;
+  color: #b4603c;
+  font-weight: 600;
+}
+
+/* 피드백 */
+.quiz-feedback {
+  margin-top: 18px;
+  border-top: 1px dashed var(--border);
+  padding-top: 16px;
+}
+.quiz-correct-msg {
+  margin: 0 0 6px;
+  color: #246b40;
+  font-weight: 800;
+}
+.quiz-explain {
+  margin: 0 0 16px;
+  color: #555;
+  line-height: 1.5;
+}
+
+/* 보물상자 */
+.quiz-chests {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.quiz-chest {
+  width: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 10px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  font: inherit;
+  cursor: default;
+}
+.quiz-chest-icon {
+  font-size: 1.8rem;
+}
+.quiz-chest-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.quiz-chest-th {
+  font-size: 0.78rem;
+  color: #999;
+}
+.quiz-chest.locked {
+  opacity: 0.55;
+}
+.quiz-chest.unlocked:not(.opened) {
+  cursor: pointer;
+  border-color: #e0b94a;
+  background: #fff8e6;
+  box-shadow: 0 6px 16px rgba(224, 185, 74, 0.3);
+  animation: chestpulse 1.4s ease-in-out infinite;
+}
+.quiz-chest.opened {
+  border-color: #3d9c63;
+  background: #eef7ea;
+}
+.quiz-chest-reward {
+  font-weight: 700;
+  color: #246b40;
+  font-size: 0.85rem;
+}
+@keyframes chestpulse {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* 시작/결과 화면 */
+.quiz-intro,
+.quiz-result {
+  text-align: center;
+  padding: 24px 8px;
+}
+.quiz-intro-emoji {
+  font-size: 3rem;
+}
+.quiz-intro h2,
+.quiz-result h2 {
+  margin: 8px 0;
+}
+.quiz-intro-lead {
+  color: #555;
+  line-height: 1.6;
+}
+.quiz-intro-points {
+  list-style: none;
+  padding: 0;
+  margin: 16px auto;
+  max-width: 420px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.quiz-intro-points li {
+  background: var(--accent-weak);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+}
+.quiz-result-stars {
+  font-size: 2rem;
+}
+.quiz-result-score {
+  font-size: 1.1rem;
+}
+.quiz-result-sub {
+  color: #777;
+}
+.quiz-result-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}

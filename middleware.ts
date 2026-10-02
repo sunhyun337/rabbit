@@ -4,7 +4,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 /**
- * 보호 경로(/chat, /game)는 로그인한 사용자만 이용할 수 있게 게이팅한다.
+ * 보호 경로(/chat, /game, /quiz)는 로그인한 사용자만 이용할 수 있게 게이팅한다.
  * Supabase 환경변수가 없으면(아직 미설정) 아무 것도 막지 않고 통과시켜
  * 앱이 정상 동작하도록 한다.
  */
@@ -45,5 +45,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/chat/:path*", "/game/:path*"],
+  matcher: ["/chat/:path*", "/game/:path*", "/quiz/:path*"],
 };

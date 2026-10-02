@@ -293,6 +293,9 @@ export default async function Home() {
                 <a className="btn big" href="/chat">
                   💬 대화하기
                 </a>
+                <a className="btn ghost big" href="/quiz">
+                  🧩 퀴즈
+                </a>
                 <a className="btn ghost big" href="/game">
                   🎮 게임
                 </a>
