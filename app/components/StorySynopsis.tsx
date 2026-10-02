@@ -118,6 +118,23 @@ const SCENES: Scene[] = [
   },
 ];
 
+/**
+ * 장면별 수채화 이미지(있으면 SVG 대신 사용). 받는 대로 한 칸씩 채운다.
+ * null인 장면은 기존 그림책풍 SVG가 그대로 나온다.
+ */
+const SCENE_IMG: (string | null)[] = [
+  "/assets/story/01.webp", // ① 깊은 병에 걸린 용왕
+  "/assets/story/02.webp", // ②
+  "/assets/story/03.webp", // ③
+  "/assets/story/04.webp", // ④
+  "/assets/story/05.webp", // ⑤
+  "/assets/story/06.webp", // ⑥
+  "/assets/story/07.webp", // ⑦
+  "/assets/story/08.webp", // ⑧
+  "/assets/story/09.webp", // ⑨
+  "/assets/story/10.webp", // ⑩
+];
+
 /* ===== 공용 SVG 조각 (그림책풍) ===== */
 function ForestBg() {
   return (
@@ -585,7 +602,11 @@ export default function StorySynopsis({
             </div>
 
             <div className="story-art">
-              <SceneArt index={idx} />
+              {SCENE_IMG[idx] ? (
+                <img className="story-img" src={SCENE_IMG[idx]!} alt={scene.title} />
+              ) : (
+                <SceneArt index={idx} />
+              )}
             </div>
 
             <div className="story-body">
