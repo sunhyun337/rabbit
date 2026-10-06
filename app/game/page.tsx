@@ -85,6 +85,100 @@ function zoneName(x: number) {
   return "🌲 숲 (육지)";
 }
 
+/**
+ * 캐릭터 그림(흰 배경)을 게임 스프라이트로 가공한다.
+ *  1) 가장자리에서 연결된 흰색만 투명 처리(내부 흰색·옷은 보존)
+ *  2) 남은 불투명 픽셀 중 '가장 큰 덩어리'(캐릭터)만 남기고 소품(벼루 등) 제거
+ *  3) 캐릭터 영역으로 crop
+ */
+function processSprite(img: HTMLImageElement): HTMLCanvasElement {
+  const scale = Math.min(1, 420 / img.width);
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, w, h);
+  const id = ctx.getImageData(0, 0, w, h);
+  const d = id.data;
+  const N = w * h;
+  // 순백뿐 아니라 '크림색 종이' 배경까지 배경으로 본다.
+  // (캐릭터는 진한 외곽선으로 둘러싸여 있어, 느슨한 기준이어도 내부 색은 보존됨)
+  const isWhite = (p: number) =>
+    d[p * 4] > 206 && d[p * 4 + 1] > 200 && d[p * 4 + 2] > 188;
+
+  // 1) 테두리에서 흰색 flood fill → 배경
+  const bg = new Uint8Array(N);
+  const stack: number[] = [];
+  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
+  while (stack.length) {
+    const p = stack.pop()!;
+    if (bg[p] || !isWhite(p)) continue;
+    bg[p] = 1;
+    const px = p % w;
+    const py = (p - px) / w;
+    if (px > 0) stack.push(p - 1);
+    if (px < w - 1) stack.push(p + 1);
+    if (py > 0) stack.push(p - w);
+    if (py < h - 1) stack.push(p + w);
+  }
+
+  // 2) 불투명 픽셀 중 가장 큰 연결 덩어리 찾기
+  const comp = new Int32Array(N);
+  let curId = 0;
+  let bestId = 0;
+  let bestSize = 0;
+  for (let p = 0; p < N; p++) {
+    if (bg[p] || comp[p]) continue;
+    curId++;
+    let size = 0;
+    const s = [p];
+    comp[p] = curId;
+    while (s.length) {
+      const q = s.pop()!;
+      size++;
+      const qx = q % w;
+      const qy = (q - qx) / w;
+      if (qx > 0 && !bg[q - 1] && !comp[q - 1]) (comp[q - 1] = curId), s.push(q - 1);
+      if (qx < w - 1 && !bg[q + 1] && !comp[q + 1]) (comp[q + 1] = curId), s.push(q + 1);
+      if (qy > 0 && !bg[q - w] && !comp[q - w]) (comp[q - w] = curId), s.push(q - w);
+      if (qy < h - 1 && !bg[q + w] && !comp[q + w]) (comp[q + w] = curId), s.push(q + w);
+    }
+    if (size > bestSize) {
+      bestSize = size;
+      bestId = curId;
+    }
+  }
+
+  // 3) 가장 큰 덩어리만 남기고 나머지 투명 + bbox crop
+  let minx = w;
+  let miny = h;
+  let maxx = 0;
+  let maxy = 0;
+  for (let p = 0; p < N; p++) {
+    if (comp[p] === bestId) {
+      const px = p % w;
+      const py = (p - px) / w;
+      if (px < minx) minx = px;
+      if (px > maxx) maxx = px;
+      if (py < miny) miny = py;
+      if (py > maxy) maxy = py;
+    } else {
+      d[p * 4 + 3] = 0;
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+  const cw = Math.max(1, maxx - minx + 1);
+  const ch = Math.max(1, maxy - miny + 1);
+  const out = document.createElement("canvas");
+  out.width = cw;
+  out.height = ch;
+  out.getContext("2d")!.drawImage(c, minx, miny, cw, ch, 0, 0, cw, ch);
+  return out;
+}
+
 export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -125,8 +219,39 @@ export default function GamePage() {
   const accelMul = useRef(1);
   const slowImmune = useRef(false);
 
+  // 줄거리 그림체 캐릭터 스프라이트(흰/크림 배경 제거 가공본)
+  const rabbitImg = useRef<HTMLCanvasElement | null>(null);
+  const turtleImg = useRef<HTMLCanvasElement | null>(null);
+
   useEffect(() => {
     setEarned(getEarnedItems());
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const load = (src: string) =>
+      new Promise<HTMLImageElement | null>((res) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => res(null);
+        im.src = src;
+      });
+    (async () => {
+      const [r, t] = await Promise.all([
+        load("/assets/char/tokki.webp"),
+        load("/assets/char/jara.webp"),
+      ]);
+      if (!alive) return;
+      try {
+        if (r) rabbitImg.current = processSprite(r);
+        if (t) turtleImg.current = processSprite(t);
+      } catch {
+        /* 가공 실패 시 기존 벡터 캐릭터로 폴백 */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
   useEffect(() => {
     equippedRef.current = equipped;
@@ -566,9 +691,20 @@ export default function GamePage() {
       }
 
       drawGoal(ctx, GOAL);
-      drawTurtleMan(ctx, turtleX.current, t, 0);
+      if (turtleImg.current)
+        drawSprite(ctx, turtleImg.current, turtleX.current, GROUND_Y, true, 64);
+      else drawTurtleMan(ctx, turtleX.current, t, 0);
       drawEquip(ctx, player.current);
-      drawRabbitGirl(ctx, player.current);
+      if (rabbitImg.current)
+        drawSprite(
+          ctx,
+          rabbitImg.current,
+          player.current.x + PW / 2,
+          player.current.y + PH,
+          player.current.face >= 0,
+          72,
+        );
+      else drawRabbitGirl(ctx, player.current);
 
       ctx.restore();
 
@@ -956,6 +1092,28 @@ export default function GamePage() {
     }
   }
 
+  // 캐릭터 스프라이트를 바닥(baseY)에 발을 맞춰 그린다. faceRight=false면 좌우 반전.
+  function drawSprite(
+    c: CanvasRenderingContext2D,
+    cv: HTMLCanvasElement,
+    cx: number,
+    baseY: number,
+    faceRight: boolean,
+    targetH: number,
+  ) {
+    const sc = targetH / cv.height;
+    const wdt = cv.width * sc;
+    c.save();
+    c.fillStyle = "rgba(0,0,0,0.16)";
+    c.beginPath();
+    c.ellipse(cx, baseY + 2, Math.max(10, wdt * 0.34), 4.5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.translate(cx, baseY);
+    if (!faceRight) c.scale(-1, 1);
+    c.drawImage(cv, -wdt / 2, -targetH, wdt, targetH);
+    c.restore();
+  }
+
   // 장착 아이템 시각 효과(토끼 뒤/주변)
   function drawEquip(
     c: CanvasRenderingContext2D,
@@ -1142,18 +1300,11 @@ export default function GamePage() {
           <div className="game-overlay">
             <div className="game-panel">
               <h2>🏁 토끼 vs 자라 경주</h2>
-              <p>
-                <b>숲 → 용궁(바다) → 숲</b>의 긴 길을 걸어 자라와 결승선까지 달려요!
-                중간에 나오는 <b>『토끼전』 질문</b>에…
-              </p>
               <p className="game-controls">
                 ✅ 정답 → <b>내 속도 UP</b> 🐰💨
-                <br />❌ 오답 → <b>자라 속도 UP</b> — 아슬아슬하게 쫓겨요!
+                <br />❌ 오답 → <b>자라 속도 UP</b>
               </p>
-              <p className="game-controls">
-                ← → 걷기 · <b>Space(또는 ↑) 점프</b>로 물웅덩이·작은 산·바위를 뛰어넘어요!
-                <br />장애물을 넘거나 반딧불을 주우면 살짝 빨라져요 ✨
-              </p>
+              <p className="game-controls">← → 걷기 · <b>Space(또는 ↑) 점프</b></p>
 
               <div className="game-items">
                 <p className="game-items-lead">
