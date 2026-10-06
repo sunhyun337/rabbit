@@ -123,9 +123,7 @@ export default function InterviewApp() {
 
       <div className="chat-list" ref={listRef}>
         {!selected && (
-          <div className="iv-empty">
-            인터뷰할 인물을 골라 주세요. 🐢 자라 · 🐰 토끼 · 🐉 용왕이 기다리고 있어요!
-          </div>
+          <div className="iv-empty">인물을 골라서 인터뷰(질문)해 보세요.</div>
         )}
         {messages.map((m, i) => (
           <div key={i} className={`bubble ${m.role}`}>

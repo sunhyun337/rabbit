@@ -162,32 +162,9 @@ export default function QuizApp() {
           <div className="quiz-intro-emoji">🧩</div>
           <h2>토끼전 퀴즈</h2>
           <p className="quiz-intro-lead">
-            단어 퀴즈 10개 + 내용 퀴즈 10개, 모두 20문제예요.
-            <br />
-            OX·객관식·주관식이 섞여 나와요.
+            점수에 맞는 보물상자를 열 수 있어요. 보물상자의 아이템은 게임에서
+            사용할 수 있습니다.
           </p>
-          <ul className="quiz-intro-points">
-            <li>⭐ 1번에 맞히면 +{POINTS_FIRST_TRY}점, 2번째에 맞히면 +{POINTS_SECOND_TRY}점</li>
-            <li>📝 객관식은 3번째도 틀리면 −{PENALTY_WRONG}점, OX·주관식은 틀리면 점수 없이 넘어가요</li>
-            <li>🎁 최종 점수에 맞는 <b>보물상자 1개</b>를 열어 게임 아이템을 얻어요!</li>
-          </ul>
-          <div className="quiz-bands">
-            {CHEST_BANDS.map((b) => {
-              const it = getItem(b.item)!;
-              return (
-                <div key={b.item} className="quiz-band">
-                  <span className="quiz-band-range">{b.range}</span>
-                  <span className="quiz-band-item">
-                    {it.icon} {it.name}
-                  </span>
-                </div>
-              );
-            })}
-            <div className="quiz-band dim">
-              <span className="quiz-band-range">60점 미만</span>
-              <span className="quiz-band-item">상자 없음 — 다시 도전!</span>
-            </div>
-          </div>
           <button className="btn big" onClick={start}>
             퀴즈 시작하기
           </button>

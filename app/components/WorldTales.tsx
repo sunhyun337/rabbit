@@ -64,7 +64,7 @@ export default function WorldTales() {
       </header>
 
       <p className="world-lead">
-        세계 여러 나라의 <b>지혜(꾀) 이야기</b>예요. 나라를 골라 읽거나 들어 보세요!
+        세계 여러 나라의 <b>지혜나 꾀에 대한 이야기</b>예요. 나라를 골라 읽거나 들어보세요.
       </p>
 
       <div className="world-grid">
@@ -104,11 +104,6 @@ export default function WorldTales() {
         </article>
       )}
 
-      {!tale && (
-        <div className="world-empty">
-          위에서 나라를 선택하면 그 나라의 지혜 이야기가 나와요. 🧠
-        </div>
-      )}
     </div>
   );
 }

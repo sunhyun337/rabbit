@@ -57,20 +57,23 @@ export default async function Home() {
               </div>
 
               <div className="home-btns">
-                <StorySynopsis label="📖 줄거리" />
+                <StorySynopsis label="📖 줄거리" className="btn big" />
                 <a className="btn big" href="/chat">
                   💬 대화 연습
                 </a>
-                <a className="btn ghost big" href="/interview">
+                <a className="btn big" href="/interview">
                   🎙️ 인터뷰
                 </a>
-                <a className="btn ghost big" href="/quiz">
+                <a className="btn big" href="/quiz">
                   🧩 퀴즈
                 </a>
-                <a className="btn ghost big" href="/game">
+                <a className="btn big" href="/game">
                   🎮 게임
                 </a>
-                <a className="btn ghost big" href="/world">
+                <a className="btn big" href="/remix">
+                  ✨ 이야기 바꾸기
+                </a>
+                <a className="btn big" href="/world">
                   🌍 다른 나라 이야기
                 </a>
               </div>
