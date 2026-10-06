@@ -45,5 +45,11 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/chat/:path*", "/game/:path*", "/quiz/:path*", "/interview/:path*"],
+  matcher: [
+    "/chat/:path*",
+    "/game/:path*",
+    "/quiz/:path*",
+    "/interview/:path*",
+    "/remix/:path*",
+  ],
 };
