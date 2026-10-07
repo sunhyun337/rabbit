@@ -79,6 +79,13 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+/** 보기를 섞고 정답 인덱스를 다시 계산한다(정답이 늘 1번이 되지 않도록). */
+function shuffleOptions(item: QuizItem): QuizItem {
+  const correct = item.options[item.answer];
+  const options = shuffle(item.options);
+  return { ...item, options, answer: options.indexOf(correct) };
+}
+
 function zoneName(x: number) {
   if (x < SEA_START) return "🌲 숲 (육지)";
   if (x < SEA_END) return "🌊 용궁 (바닷속)";
@@ -290,7 +297,7 @@ export default function GamePage() {
     splash.current = [];
     splashText.current = 0;
     gates.current = GATES.map((x) => ({ x, asked: false }));
-    quizOrder.current = shuffle(QUIZ);
+    quizOrder.current = shuffle(QUIZ).map(shuffleOptions);
     gateCount.current = 0;
     camX.current = 0;
   }, []);
