@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QUIZ, type QuizItem } from "@/lib/story/quiz";
 import { ITEMS, getEarnedItems, type ItemId } from "@/lib/story/items";
+import { sendLog, newLogId } from "@/lib/clientLog";
 
 /**
  * 『토끼전』 경주 — 토끼(플레이어) vs 자라(AI). 의인화·회화풍.
  * 긴 스테이지를 ←→ 로 걷고 ↑/Space 로 점프하며 결승선까지 간다.
- * 배경은 숲 → 용궁(바다) → 숲 (바다 진입 시 '풍덩').
+ * 배경(구간): 용궁(바닷속) → 산속(숲) → 바다와 산(해안). 용궁→산속 전환 시 '풍덩'(물 밖으로).
  * 중간 질문(퀴즈):
  *  - 정답 → 자라를 뒤로 날려버리고 자라 속도 저하 🐢💨
  *  - 오답 → 내 속도가 잠시 느려짐 (길을 막는 용왕 없음)
@@ -18,9 +19,11 @@ const VW = 900;
 const VH = 460;
 const GROUND_Y = 384;
 const GOAL = 9000;
+const SEC = GOAL / 3; // 구간 폭(3000): 용궁 / 산속 / 바다와 산
 
-const SEA_START = 3000;
-const SEA_END = 6000;
+// 물리상 '바닷속'(물속: 점프 가벼움·바위/산호/성게) 구간 = 첫 구간(용궁)
+const SEA_START = 0;
+const SEA_END = SEC;
 
 const RUN = 3.5;
 const ACCEL = 0.6;
@@ -46,19 +49,57 @@ const PLATFORMS = [
 const GATES: number[] = [];
 for (let x = 640; x < 8700; x += 700) GATES.push(x);
 
-// 뛰어넘는 장애물: 물웅덩이(느려짐) · 작은 산(막힘) · 바위(바닷속, 막힘)
-type ObType = "puddle" | "mound" | "rock";
-const OB_W: Record<ObType, number> = { puddle: 66, mound: 46, rock: 40 };
-const OB_H: Record<ObType, number> = { puddle: 0, mound: 36, rock: 30 };
+// 장애물
+//  육지: 웅덩이 puddle(빠지면 느려짐) · 작은산 mound · 통나무 log · 가시덤불 thorns(밟으면 아픔) · 그루터기 stump
+//  바다: 바위 rock · 산호 coral · 성게 urchin(밟으면 아픔)
+//  solid(mound/rock/log/stump/coral)는 막히지만 올라탈 수 있고, hazard(puddle/thorns/urchin)는
+//  통과되지만 밟으면 벌칙 → 뛰어넘어야 유리.
+type ObType =
+  | "puddle"
+  | "mound"
+  | "rock"
+  | "log"
+  | "stump"
+  | "thorns"
+  | "coral"
+  | "urchin";
+const OB_W: Record<ObType, number> = {
+  puddle: 66,
+  mound: 46,
+  rock: 40,
+  log: 74,
+  stump: 34,
+  thorns: 52,
+  coral: 36,
+  urchin: 40,
+};
+const OB_H: Record<ObType, number> = {
+  puddle: 0,
+  mound: 36,
+  rock: 30,
+  log: 26,
+  stump: 54,
+  thorns: 0,
+  coral: 48,
+  urchin: 0,
+};
+const HAZARDS = new Set<ObType>(["puddle", "thorns", "urchin"]);
+
+const LAND_TYPES: ObType[] = ["puddle", "mound", "log", "thorns", "stump"];
+const SEA_TYPES: ObType[] = ["rock", "coral", "urchin"];
 const OB_DEFS: { x: number; type: ObType }[] = [];
-for (let x = 420; x < GOAL - 320; x += 420) {
+let _li = 0;
+let _si = 0;
+for (let x = 380; x < GOAL - 300; x += 330) {
   if (x < 360) continue;
-  if (GATES.some((g) => Math.abs(g - x) < 110)) continue;
-  if (PLATFORMS.some((p) => x > p.x - 50 && x < p.x + p.w + 50)) continue;
+  if (GATES.some((g) => Math.abs(g - x) < 115)) continue;
+  if (PLATFORMS.some((p) => x > p.x - 55 && x < p.x + p.w + 55)) continue;
   // 구간 경계(숲↔바다) 주변은 비워서 전환이 항상 뚫리게 한다
-  if (Math.abs(x - SEA_START) < 240 || Math.abs(x - SEA_END) < 240) continue;
+  if (Math.abs(x - SEA_START) < 230 || Math.abs(x - SEA_END) < 230) continue;
   const inSea = x >= SEA_START && x < SEA_END;
-  const type: ObType = inSea ? "rock" : Math.floor(x / 420) % 2 === 0 ? "puddle" : "mound";
+  const type: ObType = inSea
+    ? SEA_TYPES[_si++ % SEA_TYPES.length]
+    : LAND_TYPES[_li++ % LAND_TYPES.length];
   OB_DEFS.push({ x, type });
 }
 
@@ -87,9 +128,31 @@ function shuffleOptions(item: QuizItem): QuizItem {
 }
 
 function zoneName(x: number) {
-  if (x < SEA_START) return "🌲 숲 (육지)";
-  if (x < SEA_END) return "🌊 용궁 (바닷속)";
-  return "🌲 숲 (육지)";
+  if (x < SEC) return "🌊 용궁 (바닷속)";
+  if (x < SEC * 2) return "🌲 산속 (숲)";
+  return "🏖️ 바다와 산 (해안)";
+}
+
+// 구간 [x0,x1)에 배경 그림을 채운다(세로는 화면 높이에 맞추고 가로는 원본 비율로 반복).
+function drawSectionBg(
+  c: CanvasRenderingContext2D,
+  x0: number,
+  x1: number,
+  img: HTMLImageElement | null,
+  fallback: string,
+) {
+  c.save();
+  c.beginPath();
+  c.rect(x0, 0, x1 - x0, VH);
+  c.clip();
+  if (img && img.width > 0) {
+    const w = VH * (img.width / img.height);
+    for (let x = x0; x < x1; x += w) c.drawImage(img, x, 0, w, VH);
+  } else {
+    c.fillStyle = fallback;
+    c.fillRect(x0, 0, x1 - x0, VH);
+  }
+  c.restore();
 }
 
 /**
@@ -202,7 +265,9 @@ export default function GamePage() {
   const turtleMul = useRef(1);
   const speedMul = useRef(1);
   const slowTimer = useRef(0);
-  const obstaclesRef = useRef<{ x: number; type: ObType; cleared: boolean }[]>([]);
+  const obstaclesRef = useRef<
+    { x: number; type: ObType; cleared: boolean; hit: boolean }[]
+  >([]);
   const fireflies = useRef<{ x: number; y: number; taken: boolean }[]>([]);
   const sparkles = useRef<{ x: number; y: number; vx: number; vy: number; life: number }[]>([]);
   const splash = useRef<{ x: number; y: number; vx: number; vy: number; life: number }[]>([]);
@@ -210,6 +275,7 @@ export default function GamePage() {
   const gates = useRef(GATES.map((x) => ({ x, asked: false })));
   const quizOrder = useRef<QuizItem[]>([]);
   const gateCount = useRef(0);
+  const gameSessionRef = useRef<string>("");
   const camX = useRef(0);
   const tRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -229,6 +295,8 @@ export default function GamePage() {
   // 줄거리 그림체 캐릭터 스프라이트(흰/크림 배경 제거 가공본)
   const rabbitImg = useRef<HTMLCanvasElement | null>(null);
   const turtleImg = useRef<HTMLCanvasElement | null>(null);
+  // 배경 그림(구간): [0]용궁 [1]산속 [2]바다와 산
+  const bgImgs = useRef<(HTMLImageElement | null)[]>([null, null, null]);
 
   useEffect(() => {
     setEarned(getEarnedItems());
@@ -244,11 +312,15 @@ export default function GamePage() {
         im.src = src;
       });
     (async () => {
-      const [r, t] = await Promise.all([
+      const [r, t, b1, b2, b3] = await Promise.all([
         load("/assets/char/tokki.webp"),
         load("/assets/char/jara.webp"),
+        load("/assets/game/bg1-palace.webp"),
+        load("/assets/game/bg2-forest.webp"),
+        load("/assets/game/bg3-coast.webp"),
       ]);
       if (!alive) return;
+      bgImgs.current = [b1, b2, b3];
       try {
         if (r) rabbitImg.current = processSprite(r);
         if (t) turtleImg.current = processSprite(t);
@@ -291,7 +363,11 @@ export default function GamePage() {
       if (eq.has("star")) turtleMul.current *= 0.8; // 행운의 별: 자라 느려짐
     }
     slowTimer.current = 0;
-    obstaclesRef.current = OB_DEFS.map((o) => ({ ...o, cleared: false }));
+    obstaclesRef.current = OB_DEFS.map((o) => ({
+      ...o,
+      cleared: false,
+      hit: false,
+    }));
     fireflies.current = PLATFORMS.map((p) => ({ x: p.x + p.w / 2, y: p.y - 22, taken: false }));
     sparkles.current = [];
     splash.current = [];
@@ -304,6 +380,7 @@ export default function GamePage() {
 
   const startGame = useCallback(() => {
     resetGame();
+    gameSessionRef.current = newLogId();
     setQuiz(null);
     setFeedback(null);
     phaseRef.current = "running";
@@ -315,6 +392,21 @@ export default function GamePage() {
       const item = quiz;
       if (!item) return;
       const correct = idx === item.answer;
+      sendLog([
+        {
+          feature: "game",
+          mode: "quiz",
+          content: item.q,
+          session_id: gameSessionRef.current,
+          meta: {
+            event: "quiz",
+            question: item.q,
+            picked: item.options[idx],
+            correct_answer: item.options[item.answer],
+            is_correct: correct,
+          },
+        },
+      ]);
       if (correct) {
         // 토끼만 살짝 빨라짐 — 자라는 건드리지 않는다
         speedMul.current *= 1.06;
@@ -349,6 +441,24 @@ export default function GamePage() {
     document.addEventListener("fullscreenchange", onFs);
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
+
+  // 게임 결과(완주/실패) 기록
+  useEffect(() => {
+    if (phase === "win" || phase === "lose") {
+      sendLog([
+        {
+          feature: "game",
+          mode: "result",
+          session_id: gameSessionRef.current,
+          meta: {
+            event: "result",
+            result: phase,
+            quizzes_answered: gateCount.current,
+          },
+        },
+      ]);
+    }
+  }, [phase]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -405,15 +515,28 @@ export default function GamePage() {
 
       const footX0 = p.x + PW / 2;
       let inPuddle = false;
+      let inHazard = false;
       if (p.onGround)
         for (const o of obstaclesRef.current)
-          if (o.type === "puddle" && footX0 > o.x && footX0 < o.x + OB_W.puddle) {
-            inPuddle = true;
+          if (HAZARDS.has(o.type) && footX0 > o.x && footX0 < o.x + OB_W[o.type]) {
+            inHazard = true;
+            if (o.type === "puddle") inPuddle = true;
+            // 가시덤불·성게는 밟으면 1회 크게 아프다(감속 + 자라 가속)
+            if (
+              (o.type === "thorns" || o.type === "urchin") &&
+              !o.hit &&
+              !slowImmune.current
+            ) {
+              o.hit = true;
+              slowTimer.current = Math.max(slowTimer.current, 80);
+              turtleMul.current *= 1.08;
+            }
             break;
           }
       const slowed = slowTimer.current > 0 && !slowImmune.current;
-      const puddleSlow = inPuddle && !slowImmune.current;
-      const maxRun = RUN * speedMul.current * (slowed ? 0.5 : 1) * (puddleSlow ? 0.5 : 1);
+      const hazardSlow = inHazard && !slowImmune.current;
+      const maxRun =
+        RUN * speedMul.current * (slowed ? 0.5 : 1) * (hazardSlow ? 0.5 : 1);
       const acc = ACCEL * accelMul.current;
       if (right && !left) {
         p.vx = Math.min(maxRun, p.vx + acc);
@@ -436,7 +559,7 @@ export default function GamePage() {
       prevX.current = p.x;
       let newX = p.x + p.vx;
       for (const o of obstaclesRef.current) {
-        if (o.type === "puddle") continue;
+        if (HAZARDS.has(o.type)) continue;
         const ow = OB_W[o.type];
         const otop = GROUND_Y - OB_H[o.type];
         if (newX + PW > o.x && p.x < o.x + ow && p.y + PH > otop + 6) newX = o.x - PW;
@@ -466,9 +589,9 @@ export default function GamePage() {
           p.onGround = true;
         }
       }
-      // 작은 산·바위는 위에 올라설 수 있다(갇힘 방지 — 넘거나 올라타서 지나감)
+      // solid 장애물은 위에 올라설 수 있다(갇힘 방지 — 넘거나 올라타서 지나감)
       for (const o of obstaclesRef.current) {
-        if (o.type === "puddle") continue;
+        if (HAZARDS.has(o.type)) continue;
         const ow = OB_W[o.type];
         const otop = GROUND_Y - OB_H[o.type];
         if (
@@ -650,6 +773,23 @@ export default function GamePage() {
         else drawTree(ctx, x);
       }
       for (let x = SEA_END + 120; x < GOAL; x += 150) drawFlower(ctx, x, GROUND_Y - 5, x % 2 ? "#e4572e" : "#f2b705");
+
+      // ===== 배경 그림으로 덮기(구간별): 용궁 → 산속 → 바다와 산 =====
+      drawSectionBg(ctx, -VW, SEC, bgImgs.current[0], "#14616f");
+      drawSectionBg(ctx, SEC, SEC * 2, bgImgs.current[1], "#cfe0cf");
+      drawSectionBg(ctx, SEC * 2, GOAL + VW, bgImgs.current[2], "#cfe0e6");
+      // 바닥선(캐릭터가 딛는 지면 표시)
+      ctx.fillStyle = "rgba(30,22,12,0.16)";
+      ctx.fillRect(cam, GROUND_Y + 20, VW, VH - GROUND_Y - 20);
+      // 용궁(바닷속) 구간 거품
+      for (let x = SEA_START + 40; x < SEA_END; x += 90) {
+        if (x - cam < -20 || x - cam > VW + 20) continue;
+        const by = GROUND_Y - 20 - ((t * 1.3 + x * 9) % 300);
+        ctx.fillStyle = "rgba(220,245,255,0.4)";
+        ctx.beginPath();
+        ctx.arc(x + Math.sin((t + x) / 20) * 6, by, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // 발판 + 반딧불
       for (const pl of PLATFORMS) {
@@ -923,8 +1063,9 @@ export default function GamePage() {
   }
 
   function drawObstacle(c: CanvasRenderingContext2D, o: { x: number; type: ObType }) {
+    const w = OB_W[o.type];
+    const h = OB_H[o.type];
     if (o.type === "puddle") {
-      const w = OB_W.puddle;
       c.fillStyle = "rgba(70,150,200,0.55)";
       c.beginPath();
       c.ellipse(o.x + w / 2, GROUND_Y + 7, w / 2, 8, 0, 0, Math.PI * 2);
@@ -939,8 +1080,6 @@ export default function GamePage() {
       c.arc(o.x + w * 0.35, GROUND_Y + 3, 1.6, 0, Math.PI * 2);
       c.fill();
     } else if (o.type === "mound") {
-      const w = OB_W.mound;
-      const h = OB_H.mound;
       const g = c.createLinearGradient(0, GROUND_Y - h, 0, GROUND_Y);
       g.addColorStop(0, "#86a657");
       g.addColorStop(1, "#5f4a30");
@@ -954,9 +1093,120 @@ export default function GamePage() {
       c.beginPath();
       c.ellipse(o.x + w / 2, GROUND_Y - h + 7, w / 2 - 5, 5, 0, 0, Math.PI * 2);
       c.fill();
+    } else if (o.type === "log") {
+      // 쓰러진 통나무 (넘거나 올라타기)
+      const top = GROUND_Y - h;
+      const g = c.createLinearGradient(0, top, 0, GROUND_Y);
+      g.addColorStop(0, "#b4824c");
+      g.addColorStop(1, "#7a5329");
+      c.fillStyle = g;
+      c.beginPath();
+      c.roundRect(o.x, top, w, h, h / 2);
+      c.fill();
+      c.strokeStyle = "#5e3f1f";
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.ellipse(o.x + 11, top + h / 2, 5, h / 2 - 2, 0, 0, Math.PI * 2);
+      c.stroke();
+      c.fillStyle = "#cd9a5f";
+      c.beginPath();
+      c.ellipse(o.x + 11, top + h / 2, 2.4, h / 2 - 6, 0, 0, Math.PI * 2);
+      c.fill();
+    } else if (o.type === "stump") {
+      // 나무 그루터기 (높아서 더 높이 점프)
+      const top = GROUND_Y - h;
+      const g = c.createLinearGradient(o.x, 0, o.x + w, 0);
+      g.addColorStop(0, "#6b4423");
+      g.addColorStop(0.5, "#9c6b3c");
+      g.addColorStop(1, "#6b4423");
+      c.fillStyle = g;
+      c.fillRect(o.x + 3, top + 6, w - 6, h - 6);
+      c.strokeStyle = "#5e3f1f";
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.moveTo(o.x + w * 0.38, top + 10);
+      c.lineTo(o.x + w * 0.38, GROUND_Y - 2);
+      c.moveTo(o.x + w * 0.66, top + 10);
+      c.lineTo(o.x + w * 0.66, GROUND_Y - 2);
+      c.stroke();
+      c.fillStyle = "#c59a63";
+      c.beginPath();
+      c.ellipse(o.x + w / 2, top + 6, w / 2 - 3, 6, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#8a6436";
+      c.beginPath();
+      c.ellipse(o.x + w / 2, top + 6, w / 2 - 9, 3.5, 0, 0, Math.PI * 2);
+      c.stroke();
+    } else if (o.type === "thorns") {
+      // 가시덤불 (밟으면 아픔 — 뛰어넘기!)
+      const vh = 26;
+      c.fillStyle = "#3f6b3a";
+      c.beginPath();
+      c.ellipse(o.x + w / 2, GROUND_Y - 3, w / 2, 9, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#2f5230";
+      c.lineWidth = 2;
+      for (let i = 0; i <= 6; i++) {
+        const sx = o.x + 6 + (i * (w - 12)) / 6;
+        c.beginPath();
+        c.moveTo(sx, GROUND_Y - 5);
+        c.lineTo(sx - 3, GROUND_Y - vh + (i % 2) * 6);
+        c.stroke();
+      }
+      c.fillStyle = "#c0392b";
+      for (let i = 0; i < 4; i++) {
+        c.beginPath();
+        c.arc(o.x + 10 + i * 11, GROUND_Y - 8 - (i % 2) * 5, 2, 0, Math.PI * 2);
+        c.fill();
+      }
+    } else if (o.type === "coral") {
+      // 산호 (바닷속 — 넘거나 올라타기)
+      const top = GROUND_Y - h;
+      c.strokeStyle = "#e8743b";
+      c.lineWidth = 6;
+      c.lineCap = "round";
+      c.beginPath();
+      c.moveTo(o.x + w / 2, GROUND_Y);
+      c.lineTo(o.x + w / 2, top + 8);
+      c.moveTo(o.x + w / 2, top + 24);
+      c.lineTo(o.x + 7, top + 6);
+      c.moveTo(o.x + w / 2, top + 30);
+      c.lineTo(o.x + w - 7, top + 10);
+      c.stroke();
+      c.fillStyle = "#f6a06a";
+      for (const [bx, by] of [
+        [o.x + w / 2, top + 6],
+        [o.x + 7, top + 5],
+        [o.x + w - 7, top + 9],
+      ] as const) {
+        c.beginPath();
+        c.arc(bx, by, 4, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.lineCap = "butt";
+    } else if (o.type === "urchin") {
+      // 성게 (밟으면 아픔 — 뛰어넘기!)
+      const cx = o.x + w / 2;
+      const cy = GROUND_Y - 9;
+      const r = 9;
+      c.strokeStyle = "#4a2f5c";
+      c.lineWidth = 2;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        c.beginPath();
+        c.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.8);
+        c.lineTo(cx + Math.cos(a) * (r + 8), cy + Math.sin(a) * (r + 8) * 0.8);
+        c.stroke();
+      }
+      const g = c.createRadialGradient(cx - 2, cy - 2, 2, cx, cy, r);
+      g.addColorStop(0, "#9b6aad");
+      g.addColorStop(1, "#5b3a6b");
+      c.fillStyle = g;
+      c.beginPath();
+      c.ellipse(cx, cy, r, r * 0.8, 0, 0, Math.PI * 2);
+      c.fill();
     } else {
-      const w = OB_W.rock;
-      const h = OB_H.rock;
+      // rock
       const g = c.createLinearGradient(0, GROUND_Y - h, 0, GROUND_Y);
       g.addColorStop(0, "#aab0b6");
       g.addColorStop(1, "#5b6065");
@@ -1397,8 +1647,8 @@ export default function GamePage() {
                 <button className="btn" onClick={startGame}>
                   다시 경주
                 </button>
-                <a className="btn ghost" href="/chat">
-                  말하기 연습으로 →
+                <a className="btn ghost" href="/remix">
+                  ✨ 이야기 바꾸기 →
                 </a>
               </div>
             </div>
@@ -1414,8 +1664,8 @@ export default function GamePage() {
                 <button className="btn" onClick={startGame}>
                   다시 경주
                 </button>
-                <a className="btn ghost" href="/">
-                  줄거리 다시 보기 →
+                <a className="btn ghost" href="/remix">
+                  ✨ 이야기 바꾸기 →
                 </a>
               </div>
             </div>
