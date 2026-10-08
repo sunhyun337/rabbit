@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ALL_QUIZ,
   CHEST_BANDS,
@@ -12,6 +12,14 @@ import {
   type QuizQuestion,
 } from "@/lib/story/quizSets";
 import { getItem, addEarnedItem } from "@/lib/story/items";
+import { sendLog, newLogId } from "@/lib/clientLog";
+
+function correctAnswerOf(p: Prepared): string {
+  const b = p.base;
+  if (b.type === "mc") return p.options?.[p.correctIndex ?? 0] ?? b.options?.[0] ?? "";
+  if (b.type === "ox") return b.answerBool ? "맞아요(O)" : "아니에요(X)";
+  return b.answerText?.[0] ?? "";
+}
 
 interface Prepared {
   base: QuizQuestion;
@@ -62,9 +70,31 @@ export default function QuizApp() {
   const [saAttempts, setSaAttempts] = useState(0);
 
   const [chestOpened, setChestOpened] = useState(false);
+  const quizSessionRef = useRef<string>("");
 
   const cur = items[idx];
   const resolved = solved || failed;
+
+  function logQuiz(isCorrect: boolean, gained: number) {
+    if (!cur) return;
+    sendLog([
+      {
+        feature: "quiz",
+        mode: `${cur.base.category}/${cur.base.type}`,
+        content: cur.base.q,
+        session_id: quizSessionRef.current,
+        meta: {
+          type: cur.base.type,
+          category: cur.base.category,
+          question: cur.base.q,
+          correct_answer: correctAnswerOf(cur),
+          is_correct: isCorrect,
+          attempts: Math.max(wrongPicks.length, saAttempts) + 1,
+          gained,
+        },
+      },
+    ]);
+  }
 
   function resetPerQuestion() {
     setSolved(false);
@@ -82,6 +112,7 @@ export default function QuizApp() {
     setPoints(0);
     setCorrectCount(0);
     setChestOpened(false);
+    quizSessionRef.current = newLogId();
     resetPerQuestion();
     setPhase("playing");
   }
@@ -91,12 +122,14 @@ export default function QuizApp() {
     setCorrectCount((c) => c + 1);
     setGained(g);
     setSolved(true);
+    logQuiz(true, g);
   }
 
   function finishFailed(delta: number) {
     if (delta !== 0) setPoints((p) => p + delta);
     setGained(delta);
     setFailed(true);
+    logQuiz(false, delta);
   }
 
   // 객관식: 1번째 +10, 2번째 +5, 3번째도 틀리면 -5 후 넘어감
@@ -146,6 +179,19 @@ export default function QuizApp() {
 
   function next() {
     if (idx + 1 >= items.length) {
+      sendLog([
+        {
+          feature: "quiz",
+          mode: "summary",
+          session_id: quizSessionRef.current,
+          meta: {
+            event: "finish",
+            total: items.length,
+            correct: correctCount,
+            points,
+          },
+        },
+      ]);
       setPhase("result");
       return;
     }

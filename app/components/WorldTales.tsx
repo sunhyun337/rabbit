@@ -3,6 +3,21 @@
 import { useRef, useState } from "react";
 import { WORLD_TALES } from "@/lib/story/worldTales";
 
+// 나라별 국기 이미지 코드(ISO 3166-1 alpha-2)
+const FLAG_CODE: Record<string, string> = {
+  vietnam: "vn",
+  myanmar: "mm",
+  mongolia: "mn",
+  thailand: "th",
+  china: "cn",
+  japan: "jp",
+  ghana: "gh",
+  germany: "de",
+  usa: "us",
+  india: "in",
+};
+const flagSrc = (id: string) => `/assets/flags/${FLAG_CODE[id] ?? ""}.png`;
+
 export default function WorldTales() {
   const [selected, setSelected] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -74,7 +89,12 @@ export default function WorldTales() {
             className={`world-country ${selected === t.id ? "active" : ""}`}
             onClick={() => select(t.id)}
           >
-            <span className="world-flag">{t.flag}</span>
+            <img
+              className="world-flag"
+              src={flagSrc(t.id)}
+              alt={`${t.country} 국기`}
+              loading="lazy"
+            />
             <span className="world-name">{t.country}</span>
           </button>
         ))}
@@ -84,7 +104,12 @@ export default function WorldTales() {
         <article className="world-tale">
           <div className="world-tale-top">
             <h2>
-              {tale.flag} {tale.title}
+              <img
+                className="world-tale-flag"
+                src={flagSrc(tale.id)}
+                alt={`${tale.country} 국기`}
+              />
+              {tale.title}
             </h2>
             <button
               className="world-listen"

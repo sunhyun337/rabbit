@@ -51,5 +51,7 @@ export const config = {
     "/quiz/:path*",
     "/interview/:path*",
     "/remix/:path*",
+    "/practice/:path*",
+    "/dashboard/:path*",
   ],
 };

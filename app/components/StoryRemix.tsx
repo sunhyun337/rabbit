@@ -114,7 +114,7 @@ export default function StoryRemix() {
       </header>
 
       <div className="remix-card">
-        <h2 className="remix-q">이야기를 어떻게 바꿔 볼까요?</h2>
+        <h2 className="remix-q">이야기를 원하는 대로 바꿔 보세요.</h2>
 
         <div className="remix-selects">
           <label className="remix-field">

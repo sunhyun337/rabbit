@@ -1,18 +1,12 @@
 import StorySynopsis from "@/app/components/StorySynopsis";
-import { createClient, hasSupabaseEnv } from "@/lib/supabase/server";
+import { hasSupabaseEnv } from "@/lib/supabase/server";
+import { getViewer } from "@/lib/auth/viewer";
 
 export default async function Home() {
   const gated = hasSupabaseEnv();
-  let authed = true;
-  let email: string | null = null;
-  if (gated) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    authed = !!user;
-    email = user?.email ?? null;
-  }
+  const { user, isTeacher } = await getViewer();
+  const authed = !gated || !!user;
+  const email = user?.email ?? null;
 
   return (
     <>
@@ -58,11 +52,8 @@ export default async function Home() {
 
               <div className="home-btns">
                 <StorySynopsis label="📖 줄거리" className="btn big" />
-                <a className="btn big" href="/chat">
-                  💬 대화 연습
-                </a>
-                <a className="btn big" href="/interview">
-                  🎙️ 인터뷰
+                <a className="btn big" href="/practice">
+                  🗣️ 말하기 연습
                 </a>
                 <a className="btn big" href="/quiz">
                   🧩 퀴즈
@@ -76,6 +67,11 @@ export default async function Home() {
                 <a className="btn big" href="/world">
                   🌍 다른 나라 이야기
                 </a>
+                {isTeacher && (
+                  <a className="btn big dash-btn" href="/dashboard">
+                    📊 교사 대시보드
+                  </a>
+                )}
               </div>
             </div>
           </div>
