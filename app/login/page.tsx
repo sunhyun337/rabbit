@@ -18,6 +18,7 @@ function LoginInner() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,6 +31,10 @@ function LoginInner() {
     }
     if (!email.trim() || password.length < 6) {
       setErr("아이디(이메일)를 입력하고 비밀번호는 6자 이상으로 해 주세요.");
+      return;
+    }
+    if (mode === "signup" && !consent) {
+      setErr("연구 데이터 활용 안내에 동의해야 가입할 수 있어요.");
       return;
     }
 
@@ -57,7 +62,12 @@ function LoginInner() {
         });
         if (error) throw error;
         if (data.session) {
-          // 이메일 확인이 꺼져 있으면 바로 로그인됨
+          // 이메일 확인이 꺼져 있으면 바로 로그인됨 → 연구 동의 기록
+          try {
+            await fetch("/api/consent", { method: "POST" });
+          } catch {
+            /* 동의 기록 실패는 무시 */
+          }
           router.push(next);
           router.refresh();
         } else {
@@ -141,6 +151,20 @@ function LoginInner() {
               placeholder="6자 이상"
             />
           </label>
+
+          {mode === "signup" && (
+            <label className="auth-consent">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+              />
+              <span>
+                학습 과정에서 입력한 대화·퀴즈·게임 기록이 <b>익명으로 교육 연구에
+                활용</b>되는 것에 동의합니다. (언제든 문의해 삭제를 요청할 수 있어요.)
+              </span>
+            </label>
+          )}
 
           {err && <p className="auth-err">{err}</p>}
           {msg && <p className="auth-msg">{msg}</p>}
