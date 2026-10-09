@@ -1,7 +1,7 @@
 /**
- * 『토끼전』 퀴즈 데이터 — 단어 퀴즈 10개 + 내용 퀴즈 10개.
- * 유형 비율(전체 20문항): OX 3 · 객관식 14 · 주관식 3 (≈ 15/70/15%).
- * TOPIK 4급 수준의 쉬운 문장. (게임용 quiz.ts와는 별개)
+ * 『토끼전』 퀴즈 데이터 — 단어 + 내용 + 심화 문제 풀(총 30문항).
+ * 매 판 이 풀에서 15문항을 섞어 뽑는다(QUIZ_COUNT). 심화 문제로 난이도를 높였다.
+ * TOPIK 4급 수준. (게임용 quiz.ts와는 별개)
  *
  * 객관식 options는 '정답이 항상 0번'으로 작성되어 있으니,
  * 화면에서는 반드시 보기를 섞어서(shuffle) 보여 준다.
@@ -173,8 +173,124 @@ export const CONTENT_QUIZ: QuizQuestion[] = [
   },
 ];
 
-/** 단어 → 내용 순서로 이어 붙인 전체 20문항 */
-export const ALL_QUIZ: QuizQuestion[] = [...WORD_QUIZ, ...CONTENT_QUIZ];
+/** 심화(난이도 ↑) — 줄거리의 순서·까닭·세부 내용 추론 */
+export const HARD_QUIZ: QuizQuestion[] = [
+  {
+    category: "content",
+    type: "mc",
+    q: "다음 중 이야기에서 가장 먼저 일어난 일은 무엇이에요?",
+    options: [
+      "용왕이 깊은 병에 걸렸다",
+      "자라가 숲에서 토끼를 만났다",
+      "토끼가 용궁에 도착했다",
+      "토끼가 꾀를 내어 달아났다",
+    ],
+    explain: "용왕이 병에 걸린 일이 가장 먼저 일어났어요. (병 → 자라 출발 → 토끼 만남 → 용궁 → 탈출)",
+  },
+  {
+    category: "content",
+    type: "mc",
+    q: "자라가 위험한 육지로 떠나겠다고 스스로 나선 까닭으로 가장 알맞은 것은?",
+    options: [
+      "용왕을 향한 충성심 때문에",
+      "육지 구경을 하고 싶어서",
+      "토끼와 친구가 되고 싶어서",
+      "상을 받기 싫어서",
+    ],
+    explain: "자라는 용왕을 향한 깊은 충성심으로 목숨을 아끼지 않고 나섰어요.",
+  },
+  {
+    category: "content",
+    type: "mc",
+    q: "토끼가 자라를 따라 용궁에 가기로 마음먹은 결정적인 까닭은?",
+    options: [
+      "높은 벼슬과 좋은 음식에 욕심이 나서",
+      "자라가 무서워서",
+      "숲이 싫어져서",
+      "용왕과 아는 사이여서",
+    ],
+    explain: "토끼는 산해진미와 높은 벼슬이라는 말에 그만 욕심이 나서 따라갔어요.",
+  },
+  {
+    category: "content",
+    type: "mc",
+    q: "용왕이 토끼를 서둘러 육지로 돌려보낸 까닭은 무엇이에요?",
+    options: [
+      "간을 두고 왔다는 말을 믿어서 간을 가져오게 하려고",
+      "토끼가 불쌍해서",
+      "자라가 간절히 부탁해서",
+      "토끼와 친구가 되고 싶어서",
+    ],
+    explain: "토끼가 간을 육지에 두고 왔다고 하자, 용왕은 그 간을 가져오게 하려고 돌려보냈어요.",
+  },
+  {
+    category: "content",
+    type: "mc",
+    q: "자라가 숲에서 토끼를 처음 만났을 때 보인 행동으로 알맞은 것은?",
+    options: [
+      "공손히 허리를 숙이며 좋은 소식을 전하러 왔다고 했다",
+      "토끼를 힘으로 붙잡았다",
+      "큰 소리로 토끼를 꾸짖었다",
+      "모른 척 그냥 지나쳤다",
+    ],
+    explain: "자라는 예의 바르게 허리를 숙이며 토끼를 꾀기 시작했어요.",
+  },
+  {
+    category: "content",
+    type: "ox",
+    q: "자라는 토끼가 거짓말을 했다는 사실을 끝내 알아차리지 못했다.",
+    answerBool: true,
+    explain: "맞아요. 자라는 속은 줄도 모르고 토끼를 육지까지 데려다주었어요.",
+  },
+  {
+    category: "content",
+    type: "ox",
+    q: "토끼는 꾀를 내기 전에 용궁에서 조금도 겁을 내지 않았다.",
+    answerBool: false,
+    explain: "아니에요. 토끼도 간담이 서늘할 만큼 겁이 났지만, 마음을 가라앉히고 꾀를 떠올렸어요.",
+  },
+  {
+    category: "content",
+    type: "sa",
+    q: "토끼는 힘이 아니라 슬기로운 ○○(으)로 위기를 벗어났어요. (두 글자)",
+    answerText: ["지혜", "슬기"],
+    explain: "토끼는 힘이 아니라 '지혜(꾀)'로 위기를 벗어났어요.",
+  },
+  {
+    category: "word",
+    type: "mc",
+    q: "'간담이 서늘하다'는 어떤 상황에서 쓰는 말이에요?",
+    options: [
+      "몹시 놀라고 겁이 날 때",
+      "매우 기쁘고 신날 때",
+      "몸이 따뜻해질 때",
+      "배가 몹시 고플 때",
+    ],
+    explain: "'간담이 서늘하다'는 몹시 놀라거나 겁이 날 때 쓰는 말이에요.",
+  },
+  {
+    category: "word",
+    type: "mc",
+    q: "'눈이 멀다'(욕심에 눈이 멀다)의 뜻으로 알맞은 것은?",
+    options: [
+      "이성을 잃을 만큼 한 가지에 빠지다",
+      "눈병이 나서 아프다",
+      "길을 잃고 헤매다",
+      "잠이 쏟아지다",
+    ],
+    explain: "여기서 '눈이 멀다'는 욕심에 빠져 바르게 판단하지 못하는 것을 뜻해요.",
+  },
+];
+
+/** 전체 문제 풀(단어 + 내용 + 심화) — 매 판 여기서 15문항을 섞어 뽑는다. */
+export const ALL_QUIZ: QuizQuestion[] = [
+  ...WORD_QUIZ,
+  ...CONTENT_QUIZ,
+  ...HARD_QUIZ,
+];
+
+/** 한 판에 내는 문제 수 */
+export const QUIZ_COUNT = 15;
 
 /** 주관식 정답 비교용 정규화(공백 제거) */
 export function normalizeAnswer(s: string): string {
@@ -194,11 +310,11 @@ export interface ChestBand {
  * 점수가 높을수록 더 좋은 아이템을 얻는다. (내림차순 정렬)
  */
 export const CHEST_BANDS: ChestBand[] = [
-  { min: 190, item: "star", range: "190점 이상" },
-  { min: 160, item: "wings", range: "160–189점" },
-  { min: 130, item: "shield", range: "130–159점" },
-  { min: 100, item: "carrot", range: "100–129점" },
-  { min: 60, item: "wind", range: "60–99점" },
+  { min: 140, item: "star", range: "140점 이상" },
+  { min: 118, item: "wings", range: "118–139점" },
+  { min: 95, item: "shield", range: "95–117점" },
+  { min: 72, item: "carrot", range: "72–94점" },
+  { min: 45, item: "wind", range: "45–71점" },
 ];
 
 /** 점수에 맞는 보물상자 구간(60점 미만이면 null) */

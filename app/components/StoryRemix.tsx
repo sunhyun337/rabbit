@@ -23,9 +23,13 @@ export default function StoryRemix() {
   const [custom, setCustom] = useState("");
   const [loading, setLoading] = useState(false);
   const [stories, setStories] = useState<MadeStory[]>([]);
+  const [activeId, setActiveId] = useState<number | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const seq = useRef(0);
+
+  const current =
+    stories.find((s) => s.id === activeId) ?? stories[0] ?? null;
 
   async function unfold() {
     if (loading) return;
@@ -46,9 +50,10 @@ export default function StoryRemix() {
       const lines = full.split("\n").map((l: string) => l.trim()).filter(Boolean);
       const title = lines[0] || "새로운 토끼전 이야기";
       const body = lines.slice(1);
+      const id = ++seq.current;
       setStories((prev) => [
         {
-          id: ++seq.current,
+          id,
           title,
           body: body.length ? body : [full],
           change: changeLabel(change),
@@ -57,10 +62,12 @@ export default function StoryRemix() {
         },
         ...prev,
       ]);
+      setActiveId(id);
     } catch {
+      const id = ++seq.current;
       setStories((prev) => [
         {
-          id: ++seq.current,
+          id,
           title: "⚠️ 이야기를 만들지 못했어요",
           body: ["잠시 후 다시 시도해 주세요."],
           change: changeLabel(change),
@@ -69,6 +76,7 @@ export default function StoryRemix() {
         },
         ...prev,
       ]);
+      setActiveId(id);
     } finally {
       setLoading(false);
     }
@@ -105,22 +113,29 @@ export default function StoryRemix() {
   }
 
   return (
-    <div className="remix-wrap">
-      <header className="remix-header">
+    <div className="remix2-wrap">
+      <header className="remix2-header">
         <a href="/" className="chat-back">
           ← 홈
         </a>
         <span className="chat-title">✨ 이야기 바꾸기</span>
       </header>
 
-      <div className="remix-card">
-        <h2 className="remix-q">이야기를 원하는 대로 바꿔 보세요.</h2>
+      <div className="remix2-grid">
+        {/* 왼쪽: 바꾸기 옵션 */}
+        <section className="remix2-left">
+          <div className="remix2-intro">
+            <h2 className="remix2-q">이야기를 원하는 대로 바꿔 보세요.</h2>
+            <p className="remix2-sub">
+              바꿀 내용과 분위기를 고르고 펼치면, 오른쪽 책에 새로운 『토끼전』이
+              적혀요.
+            </p>
+          </div>
 
-        <div className="remix-selects">
-          <label className="remix-field">
-            <span className="remix-field-label">이야기 변화</span>
+          <label className="remix2-field">
+            <span className="remix2-field-label">① 이야기 변화</span>
             <select
-              className="remix-select"
+              className="remix2-select"
               value={change}
               onChange={(e) => setChange(e.target.value)}
             >
@@ -132,10 +147,10 @@ export default function StoryRemix() {
             </select>
           </label>
 
-          <label className="remix-field">
-            <span className="remix-field-label">분위기 변화</span>
+          <label className="remix2-field">
+            <span className="remix2-field-label">② 분위기 변화</span>
             <select
-              className="remix-select"
+              className="remix2-select"
               value={mood}
               onChange={(e) => setMood(e.target.value)}
             >
@@ -146,53 +161,85 @@ export default function StoryRemix() {
               ))}
             </select>
           </label>
-        </div>
 
-        <label className="remix-field">
-          <span className="remix-field-label">꼭 넣고 싶은 이야기 (선택)</span>
-          <textarea
-            className="remix-textarea"
-            rows={3}
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            placeholder="예: 자라가 사실 용궁의 비밀 지도를 숨기고 있었으면 좋겠어요"
-          />
-        </label>
+          <label className="remix2-field">
+            <span className="remix2-field-label">③ 꼭 넣고 싶은 이야기 (선택)</span>
+            <textarea
+              className="remix2-textarea"
+              rows={3}
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              placeholder="예: 자라가 사실 용궁의 비밀 지도를 숨기고 있었으면 좋겠어요"
+            />
+          </label>
 
-        <button className="btn big remix-go" onClick={unfold} disabled={loading}>
-          {loading ? "이야기를 펼치는 중…" : "✨ 새로운 이야기 펼치기"}
-        </button>
-      </div>
+          <button className="remix2-go" onClick={unfold} disabled={loading}>
+            {loading ? "이야기를 펼치는 중…" : "✨ 새로운 이야기 펼치기"}
+          </button>
 
-      <h2 className="remix-shelf-title">📚 내가 바꾼 이야기 책장</h2>
-      {stories.length === 0 && !loading && (
-        <div className="remix-empty">
-          아직 바꾼 이야기가 없어요. 첫 번째 이야기를 펼쳐 보세요!
-        </div>
-      )}
-
-      <div className="remix-stories">
-        {stories.map((s) => (
-          <article key={s.id} className="remix-story">
-            <div className="remix-story-top">
-              <h3>{s.title}</h3>
-              {s.full && (
-                <button className="world-listen" onClick={() => listen(s)}>
-                  {playingId === s.id ? "⏹ 멈춤" : "🔊 듣기"}
-                </button>
-              )}
+          {stories.length > 0 && (
+            <div className="remix2-history">
+              <div className="remix2-history-title">
+                📚 내가 바꾼 이야기 ({stories.length})
+              </div>
+              <div className="remix2-history-list">
+                {stories.map((s) => (
+                  <button
+                    key={s.id}
+                    className={`remix2-history-item ${
+                      current?.id === s.id ? "active" : ""
+                    }`}
+                    onClick={() => setActiveId(s.id)}
+                  >
+                    {s.title}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="remix-tags">
-              <span className="remix-tag">{s.change}</span>
-              <span className="remix-tag mood">{s.mood}</span>
-            </div>
-            {s.body.map((p, i) => (
-              <p key={i} className="remix-para">
-                {p}
-              </p>
-            ))}
-          </article>
-        ))}
+          )}
+        </section>
+
+        {/* 오른쪽: 책 */}
+        <section className="remix2-right">
+          <div className={`remix2-book ${current ? "open" : ""}`}>
+            {current ? (
+              <>
+                <div className="remix2-book-head">
+                  <div className="remix2-tags">
+                    <span className="remix2-tag">{current.change}</span>
+                    <span className="remix2-tag mood">{current.mood}</span>
+                  </div>
+                  {current.full && (
+                    <button
+                      className="remix2-listen"
+                      onClick={() => listen(current)}
+                    >
+                      {playingId === current.id ? "⏹ 멈춤" : "🔊 듣기"}
+                    </button>
+                  )}
+                </div>
+                <h3 className="remix2-book-title">{current.title}</h3>
+                <div className="remix2-book-text">
+                  {current.body.map((p, i) => (
+                    <p key={i} className="remix2-para">
+                      {p}
+                    </p>
+                  ))}
+                </div>
+              </>
+            ) : loading ? (
+              <div className="remix2-placeholder">
+                <div className="remix2-placeholder-emoji">✨</div>
+                이야기를 펼치는 중…
+              </div>
+            ) : (
+              <div className="remix2-placeholder">
+                <div className="remix2-placeholder-emoji">📖</div>
+                왼쪽에서 이야기를 골라 펼쳐 보세요.
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

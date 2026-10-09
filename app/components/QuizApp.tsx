@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import {
   ALL_QUIZ,
+  QUIZ_COUNT,
   CHEST_BANDS,
   rewardBand,
   POINTS_FIRST_TRY,
@@ -13,6 +14,40 @@ import {
 } from "@/lib/story/quizSets";
 import { getItem, addEarnedItem } from "@/lib/story/items";
 import { sendLog, newLogId } from "@/lib/clientLog";
+
+// 문제 내용과 관계있는 장식 그림(이모지). 주제 키워드를 인물명보다 먼저 확인한다.
+const EMOJI_MAP: [string, string][] = [
+  ["간담", "😱"],
+  ["눈이 멀", "🤑"],
+  ["욕심", "🤑"],
+  ["거짓말", "🤥"],
+  ["용궁", "🏯"],
+  ["벼슬", "👑"],
+  ["충성", "🫡"],
+  ["효험", "✨"],
+  ["의원", "🧑‍⚕️"],
+  ["병", "🤒"],
+  ["약", "💊"],
+  ["간", "🫀"],
+  ["바닷속", "🌊"],
+  ["바다", "🌊"],
+  ["육지", "🌲"],
+  ["숲", "🌳"],
+  ["지혜", "💡"],
+  ["슬기", "💡"],
+  ["꾀", "💡"],
+  ["먼저", "🔢"],
+  ["순서", "🔢"],
+  ["달아", "🏃"],
+  ["용왕", "🐉"],
+  ["별주부", "🐢"],
+  ["자라", "🐢"],
+  ["토끼", "🐰"],
+];
+function questionEmoji(q: string): string {
+  for (const [k, e] of EMOJI_MAP) if (q.includes(k)) return e;
+  return "🧩";
+}
 
 function correctAnswerOf(p: Prepared): string {
   const b = p.base;
@@ -51,7 +86,7 @@ const TYPE_LABEL: Record<QuizQuestion["type"], string> = {
   sa: "주관식",
 };
 
-const MAX_POINTS = ALL_QUIZ.length * POINTS_FIRST_TRY;
+const MAX_POINTS = QUIZ_COUNT * POINTS_FIRST_TRY;
 
 export default function QuizApp() {
   const [phase, setPhase] = useState<"intro" | "playing" | "result">("intro");
@@ -107,7 +142,7 @@ export default function QuizApp() {
   }
 
   function start() {
-    setItems(ALL_QUIZ.map(prepare));
+    setItems(shuffle(ALL_QUIZ).slice(0, QUIZ_COUNT).map(prepare));
     setIdx(0);
     setPoints(0);
     setCorrectCount(0);
@@ -232,7 +267,7 @@ export default function QuizApp() {
           <div className="quiz-result-stars">{"⭐".repeat(stars) || "🙂"}</div>
           <h2>퀴즈 완료!</h2>
           <p className="quiz-result-score">
-            {ALL_QUIZ.length}문제 중 <b>{correctCount}</b>개 정답 · <b>{points}</b>점
+            {items.length}문제 중 <b>{correctCount}</b>개 정답 · <b>{points}</b>점
           </p>
 
           {band && item ? (
@@ -263,7 +298,7 @@ export default function QuizApp() {
             </>
           ) : (
             <p className="quiz-result-sub">
-              앗! <b>60점</b>을 넘으면 보물상자를 열 수 있어요. 다시 도전해 볼까요?
+              앗! <b>45점</b>을 넘으면 보물상자를 열 수 있어요. 다시 도전해 볼까요?
             </p>
           )}
 
@@ -291,7 +326,7 @@ export default function QuizApp() {
     !resolved && (wrongPicks.length > 0 || saWrong);
 
   return (
-    <div className="quiz-wrap">
+    <div className="quiz-wrap playing">
       <QuizHeader points={points} />
 
       <div className="quiz-progress">
@@ -307,7 +342,12 @@ export default function QuizApp() {
         </span>
       </div>
 
+      <div className="quiz-stage">
       <div className="quiz-card">
+        <div className={`quiz-illust cat-${cur.base.category}`}>
+          <span>{questionEmoji(cur.base.q)}</span>
+        </div>
+        <div className="quiz-main">
         <p className="quiz-q">{cur.base.q}</p>
 
         {type === "mc" && (
@@ -398,6 +438,8 @@ export default function QuizApp() {
             </button>
           </div>
         )}
+        </div>
+      </div>
       </div>
     </div>
   );
