@@ -181,7 +181,11 @@ export default function SpeakingPractice() {
       <div className="practice-grid">
         {/* 왼쪽: 줄거리 */}
         <section className="practice-left">
-          <div className="story-art">
+          <div
+            className={`story-art${
+              idx === 9 ? " crop-top10" : idx === 8 ? " crop-top" : ""
+            }`}
+          >
             {img ? (
               <img className="story-img" src={img} alt={scene.title} />
             ) : (
@@ -191,7 +195,9 @@ export default function SpeakingPractice() {
           <div className="story-body">
             <h3>{scene.title}</h3>
             <p className="story-text">{renderGlossed(scene.text, scene.words)}</p>
-            <p className="story-hint">💡 밑줄 친 단어에 마우스를 올리면 뜻이 나와요.</p>
+            {idx === 0 && (
+              <p className="story-hint">💡 밑줄 친 단어에 마우스를 올리면 뜻이 나와요.</p>
+            )}
           </div>
           <div className="story-dots">
             {SCENES.map((_, i) => (

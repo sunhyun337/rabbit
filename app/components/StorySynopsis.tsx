@@ -622,7 +622,9 @@ export default function StorySynopsis({
             <div className="story-body">
               <h3>{scene.title}</h3>
               <p className="story-text">{renderGlossed(scene.text, scene.words)}</p>
-              <p className="story-hint">💡 밑줄 친 단어에 마우스를 올리면 뜻이 나와요.</p>
+              {idx === 0 && (
+                <p className="story-hint">💡 밑줄 친 단어에 마우스를 올리면 뜻이 나와요.</p>
+              )}
             </div>
 
             <div className="story-dots">

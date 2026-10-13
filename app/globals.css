@@ -1401,6 +1401,53 @@ a {
   color: #888 !important;
 }
 
+/* 시작화면(intro) — 크게, 화면에 꽉 차게 */
+.game-panel.intro-panel {
+  max-width: min(94vw, 1100px);
+  width: 100%;
+  min-height: min(84vh, 780px);
+  padding: clamp(28px, 6vh, 70px) clamp(24px, 5vw, 64px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 4.5vh, 48px);
+}
+
+.intro-title {
+  margin: 0;
+  font-size: clamp(2.3rem, 6.2vw, 4.4rem);
+  line-height: 1.15;
+}
+
+.intro-line {
+  margin: 0;
+  color: #3a3a3a !important;
+  font-size: clamp(1.4rem, 3.6vw, 2.6rem);
+  line-height: 1.6;
+  font-weight: 600;
+}
+
+.intro-line b {
+  color: #1f6f43;
+}
+
+.intro-controls {
+  color: #666 !important;
+  font-weight: 500;
+}
+
+.intro-controls b {
+  color: #333;
+}
+
+.btn.intro-start {
+  margin-top: clamp(6px, 2vh, 22px);
+  font-size: clamp(1.3rem, 3.2vw, 2.1rem);
+  padding: clamp(12px, 2.4vh, 22px) clamp(32px, 6vw, 64px);
+  border-radius: 999px;
+}
+
 .game-btnrow {
   display: flex;
   gap: 10px;
@@ -2488,9 +2535,10 @@ button.btn {
 /* ===== 말하기 연습 (줄거리 + 챗봇 2단) ===== */
 .practice-wrap {
   height: 100dvh;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 12px 16px 14px;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 10px 20px 14px;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -2529,6 +2577,31 @@ button.btn {
 }
 .practice-left .story-art {
   margin: 0 0 12px;
+}
+/* 9·10번 그림: 이미지의 위쪽 50%만 보이고 아래 50%는 가린다 */
+.practice-left .story-art.crop-top {
+  aspect-ratio: 2048 / 559;
+}
+.practice-left .story-art.crop-top .story-img {
+  object-fit: cover;
+  object-position: top;
+}
+/* 10번 그림: 원본 위쪽 패널(거북이·토끼 작별 장면)을 보여준다.
+   본문 텍스트가 길어 한 화면에 다 들어가야 하므로, 그림은 남는 공간을 채우되
+   더 커지지 않도록 상한(max-height)을 둔다. object-position:top 으로 항상 위쪽만 노출.
+   practice-left(flex 컬럼)에서 flex:1 1 auto + min-height:0 이면 공간에 맞춰 줄어들어
+   스크롤 없이 한 화면에 들어간다. */
+.practice-left .story-art.crop-top10 {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 190px;
+  aspect-ratio: auto;
+}
+.practice-left .story-art.crop-top10 .story-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
 }
 .practice-right {
   overflow: hidden;
@@ -2571,6 +2644,68 @@ button.btn {
   height: 100%;
   color: #888;
 }
+
+/* 전체화면 연습 — 글자 크게 + 색 진하게 */
+.practice-header .chat-back {
+  font-size: 1.1rem;
+}
+.practice-header .chat-title {
+  font-size: 1.45rem;
+  color: #1c1c1c;
+}
+.practice-header .practice-sub {
+  font-size: 1.05rem;
+  color: #555;
+}
+.practice-left .story-body h3 {
+  font-size: 1.8rem;
+  color: #17211c;
+}
+.practice-left .story-body p,
+.practice-left .story-text {
+  font-size: 1.32rem;
+  line-height: 1.8;
+  color: #1a1a1a;
+}
+.practice-left .gloss {
+  color: #0f4d31;
+  font-weight: 600;
+}
+.practice-left .story-hint {
+  font-size: 1.02rem;
+  color: #4f6258;
+}
+.practice-left .story-count {
+  font-size: 1.1rem;
+  color: #333;
+}
+.practice-right .practice-mode {
+  font-size: 1.08rem;
+  padding: 8px 16px;
+}
+.practice-right .practice-mode-emoji {
+  font-size: 1.3rem;
+}
+.practice-right .bubble {
+  font-size: 1.24rem;
+  line-height: 1.65;
+  max-width: 86%;
+  padding: 14px 18px;
+}
+.practice-right .bubble.assistant {
+  color: #1a1a1a;
+}
+.practice-right .chat-input textarea {
+  font-size: 1.18rem;
+  color: #1a1a1a;
+}
+.practice-right .chat-input button {
+  font-size: 1.12rem;
+}
+.practice-right .mic-btn {
+  font-size: 1.05rem;
+}
+
 @media (max-width: 820px) {
   .practice-wrap {
     height: auto;

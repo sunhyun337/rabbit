@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QUIZ, type QuizItem } from "@/lib/story/quiz";
-import { ITEMS, getEarnedItems, type ItemId } from "@/lib/story/items";
+import { type ItemId } from "@/lib/story/items";
 import { sendLog, newLogId } from "@/lib/clientLog";
+import { GameMusic } from "@/lib/gameMusic";
 
 /**
  * 『토끼전』 경주 — 토끼(플레이어) vs 자라(AI). 의인화·회화풍.
@@ -18,8 +19,8 @@ import { sendLog, newLogId } from "@/lib/clientLog";
 const VW = 900;
 const VH = 460;
 const GROUND_Y = 384;
-const GOAL = 9000;
-const SEC = GOAL / 3; // 구간 폭(3000): 용궁 / 산속 / 바다와 산
+const GOAL = 13500;
+const SEC = GOAL / 3; // 구간 폭(4500): 용궁 / 산속 / 바다와 산
 
 // 물리상 '바닷속'(물속: 점프 가벼움·바위/산호/성게) 구간 = 첫 구간(용궁)
 const SEA_START = 0;
@@ -32,22 +33,352 @@ const TURTLE = 2.0;
 const PW = 28;
 const PH = 48;
 
-// 떠 있는 발판(반딧불 수집용) — 점프의 재미
-const PLATFORMS = [
-  { x: 820, y: 300, w: 120 },
-  { x: 1500, y: 268, w: 120 },
-  { x: 2300, y: 296, w: 120 },
-  { x: 3500, y: 300, w: 130 },
-  { x: 4400, y: 264, w: 130 },
-  { x: 5200, y: 300, w: 130 },
-  { x: 6400, y: 296, w: 120 },
-  { x: 7300, y: 268, w: 120 },
-  { x: 8100, y: 300, w: 120 },
-];
+// 공중에 띄운 얇은 단(허들) — 반드시 점프해서 넘어야 한다(아래로는 못 지나감). 코인은 그 위에.
+const PLAT_THICK = 12;
+const PLATFORMS: { x: number; y: number; w: number }[] = [];
+for (let i = 0, x = 820; x < GOAL - 500; x += 900, i++) {
+  PLATFORMS.push({ x, y: GROUND_Y - (i % 2 ? 52 : 42), w: 92 });
+}
 
-// 질문 관문(12개 — 한 판에 10개 이상)
+// 질문 관문 — 한 판에 많이 물어본다(약 20개)
 const GATES: number[] = [];
-for (let x = 640; x < 8700; x += 700) GATES.push(x);
+for (let x = 640; x < GOAL - 500; x += 640) GATES.push(x);
+
+// 지형 — 지하 구덩이(pit)에 떨어졌다 올라오고, 구름다리(bridge)를 타고 올라갔다 내려온다.
+type TerrainType = "pit" | "bridge";
+interface Terrain {
+  type: TerrainType;
+  x: number;
+  w: number;
+  d: number; // 깊이(pit=아래로) / 높이(bridge=위로)
+}
+const TERRAIN: Terrain[] = [];
+{
+  let tt = 0;
+  for (let i = 1; i < GATES.length - 1; i += 2) {
+    const mid = (GATES[i] + GATES[i + 1]) / 2;
+    // 구덩이를 더 자주(둘에 하나꼴로 구름다리)
+    const type: TerrainType = tt % 3 === 2 ? "bridge" : "pit";
+    const w = type === "pit" ? 120 : 210;
+    const x = Math.round(mid - w / 2);
+    if (Math.abs(x - SEA_END) < 320 || Math.abs(x + w - SEA_END) < 320) continue;
+    if (PLATFORMS.some((p) => p.x > x - 130 && p.x < x + w + 130)) continue;
+    TERRAIN.push({ type, x, w, d: type === "pit" ? 104 : 92 });
+    tt++;
+  }
+}
+/** 해당 x의 지면 높이. 구덩이는 수직 벽(평평한 바닥), 구름다리는 완만한 경사. */
+function groundAt(x: number): number {
+  for (const f of TERRAIN) {
+    if (x > f.x && x < f.x + f.w) {
+      if (f.type === "pit") return GROUND_Y + f.d; // 수직 벽 구덩이
+      const t = (x - f.x) / f.w;
+      const r = 0.3;
+      const k = t < r ? t / r : t > 1 - r ? (1 - t) / r : 1;
+      return GROUND_Y - f.d * k; // 구름다리(경사)
+    }
+  }
+  return GROUND_Y;
+}
+
+// 구덩이(pit) 그림 스프라이트 — 숲 구덩이 그림에서 구멍+바위 테두리만 잘라
+// 가장자리를 페이드해 게임 지면에 자연스럽게 녹아들게 가공한 결과를 캐시한다.
+let PIT_IMG: HTMLCanvasElement | null = null;
+function bakePitSprite(im: HTMLImageElement): HTMLCanvasElement {
+  const CROP = { sx: 208, sy: 258, sw: 464, sh: 301 };
+  const o = document.createElement("canvas");
+  o.width = CROP.sw;
+  o.height = CROP.sh;
+  const oc = o.getContext("2d")!;
+  oc.drawImage(im, CROP.sx, CROP.sy, CROP.sw, CROP.sh, 0, 0, CROP.sw, CROP.sh);
+  oc.globalCompositeOperation = "destination-out";
+  let g = oc.createLinearGradient(0, 0, 0, 70); // 윗면: 지면에 녹아들게 강한 페이드
+  g.addColorStop(0, "rgba(0,0,0,1)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(0, 0, CROP.sw, 70);
+  const F = 30; // 좌우/하단: 약한 페이드
+  g = oc.createLinearGradient(0, 0, F, 0);
+  g.addColorStop(0, "rgba(0,0,0,0.9)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(0, 0, F, CROP.sh);
+  g = oc.createLinearGradient(CROP.sw, 0, CROP.sw - F, 0);
+  g.addColorStop(0, "rgba(0,0,0,0.9)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(CROP.sw - F, 0, F, CROP.sh);
+  g = oc.createLinearGradient(0, CROP.sh, 0, CROP.sh - F);
+  g.addColorStop(0, "rgba(0,0,0,0.6)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(0, CROP.sh - F, CROP.sw, F);
+  oc.globalCompositeOperation = "source-over";
+  return o;
+}
+
+// 통나무(log) 장애물 그림 스프라이트 — 쓰러진 고목 그림에서 트렁크+뿌리만 잘라
+// 상·하·좌·우 가장자리를 페이드해 게임 지면에 자연스럽게 녹아들게 가공.
+let LOG_IMG: HTMLCanvasElement | null = null;
+function bakeLogSprite(im: HTMLImageElement): HTMLCanvasElement {
+  const CROP = { sx: 20, sy: 120, sw: 1160, sh: 420 };
+  const o = document.createElement("canvas");
+  o.width = CROP.sw;
+  o.height = CROP.sh;
+  const oc = o.getContext("2d")!;
+  oc.drawImage(im, CROP.sx, CROP.sy, CROP.sw, CROP.sh, 0, 0, CROP.sw, CROP.sh);
+  const W = CROP.sw,
+    H = CROP.sh;
+  oc.globalCompositeOperation = "destination-out";
+  let g = oc.createLinearGradient(0, 0, 0, 150); // 상단 하늘 페이드
+  g.addColorStop(0, "rgba(0,0,0,1)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(0, 0, W, 150);
+  g = oc.createLinearGradient(0, H, 0, H - 70); // 하단 지면 페이드
+  g.addColorStop(0, "rgba(0,0,0,0.9)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(0, H - 70, W, 70);
+  g = oc.createLinearGradient(0, 0, 90, 0); // 좌
+  g.addColorStop(0, "rgba(0,0,0,0.95)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(0, 0, 90, H);
+  g = oc.createLinearGradient(W, 0, W - 90, 0); // 우
+  g.addColorStop(0, "rgba(0,0,0,0.95)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  oc.fillStyle = g;
+  oc.fillRect(W - 90, 0, 90, H);
+  oc.globalCompositeOperation = "source-over";
+  return o;
+}
+
+// 바위(rock) 장애물 그림 스프라이트 — 바위 그림에서 바위 덩어리만 잘라
+// (밝은 하늘만 제거 + 타원 비네트로 가장자리 배경 페이드).
+let ROCK_IMG: HTMLCanvasElement | null = null;
+function bakeRockSprite(im: HTMLImageElement): HTMLCanvasElement {
+  const CROP = { sx: 185, sy: 32, sw: 545, sh: 446 };
+  const o = document.createElement("canvas");
+  o.width = CROP.sw;
+  o.height = CROP.sh;
+  const oc = o.getContext("2d")!;
+  oc.drawImage(im, CROP.sx, CROP.sy, CROP.sw, CROP.sh, 0, 0, CROP.sw, CROP.sh);
+  const W = CROP.sw,
+    H = CROP.sh;
+  const id = oc.getImageData(0, 0, W, H);
+  const d = id.data;
+  const N = W * H;
+  const lum = (p: number) => 0.3 * d[p * 4] + 0.59 * d[p * 4 + 1] + 0.11 * d[p * 4 + 2];
+  const sat = (p: number) => {
+    const r = d[p * 4],
+      g = d[p * 4 + 1],
+      b = d[p * 4 + 2];
+    return Math.max(r, g, b) - Math.min(r, g, b);
+  };
+  // 1) 밝은 하늘만 가장자리 플러드필로 제거
+  const isSky = (p: number) => lum(p) > 140 && sat(p) < 45;
+  const bg = new Uint8Array(N);
+  const st: number[] = [];
+  for (let x = 0; x < W; x++) st.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y++) st.push(y * W, y * W + W - 1);
+  while (st.length) {
+    const p = st.pop()!;
+    if (bg[p] || !isSky(p)) continue;
+    bg[p] = 1;
+    const px = p % W,
+      py = (p - px) / W;
+    if (px > 0) st.push(p - 1);
+    if (px < W - 1) st.push(p + 1);
+    if (py > 0) st.push(p - W);
+    if (py < H - 1) st.push(p + W);
+  }
+  for (let p = 0; p < N; p++) if (bg[p]) d[p * 4 + 3] = 0;
+  oc.putImageData(id, 0, 0);
+  // 2) 타원 비네트로 가운데 바위만 남기고 가장자리 배경 페이드
+  oc.globalCompositeOperation = "destination-in";
+  const cx = W / 2,
+    cy = H * 0.52;
+  const rg = oc.createRadialGradient(cx, cy, Math.min(W, H) * 0.16, cx, cy, W * 0.5);
+  rg.addColorStop(0, "rgba(0,0,0,1)");
+  rg.addColorStop(0.62, "rgba(0,0,0,1)");
+  rg.addColorStop(1, "rgba(0,0,0,0)");
+  oc.save();
+  oc.translate(cx, cy);
+  oc.scale(1, H / W);
+  oc.translate(-cx, -cy);
+  oc.fillStyle = rg;
+  oc.fillRect(0, 0, W, H);
+  oc.restore();
+  oc.globalCompositeOperation = "source-over";
+  // 3) 남은 영역 bbox로 크롭
+  const a = oc.getImageData(0, 0, W, H).data;
+  let minx = W,
+    miny = H,
+    maxx = 0,
+    maxy = 0;
+  for (let p = 0; p < N; p++) {
+    if (a[p * 4 + 3] > 12) {
+      const px = p % W,
+        py = (p - px) / W;
+      if (px < minx) minx = px;
+      if (px > maxx) maxx = px;
+      if (py < miny) miny = py;
+      if (py > maxy) maxy = py;
+    }
+  }
+  const cw = Math.max(1, maxx - minx + 1),
+    ch = Math.max(1, maxy - miny + 1);
+  const out = document.createElement("canvas");
+  out.width = cw;
+  out.height = ch;
+  out.getContext("2d")!.drawImage(o, minx, miny, cw, ch, 0, 0, cw, ch);
+  return out;
+}
+
+/** 지형(구덩이·구름다리) 그리기 — 지면 곡선을 따라 그린다. */
+function drawTerrain(c: CanvasRenderingContext2D, f: Terrain) {
+  const N = 26;
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= N; i++) {
+    const x = f.x + (f.w * i) / N;
+    pts.push([x, groundAt(x)]);
+  }
+  if (f.type === "pit") {
+    // 구덩이 그림(숲 구덩이)이 준비되면 그걸로 그린다. 충돌 박스(f.w=120)보다
+    // 넓게·센터정렬로 그려 그림이 눌리지 않게 하고, 윗부분을 지면에 맞춘다.
+    if (PIT_IMG) {
+      const cx = f.x + f.w / 2;
+      const DW = f.w * 2.0;
+      const DH = DW * (PIT_IMG.height / PIT_IMG.width);
+      c.drawImage(PIT_IMG, cx - DW / 2, GROUND_Y - 24, DW, DH);
+      return;
+    }
+    // (폴백) 지하 구덩이 — 가장자리(테두리)만 벽돌, 안쪽은 비어 있는 어두운 구멍
+    const topY = GROUND_Y;
+    const botY = GROUND_Y + f.d;
+    const BH = 12; // 벽돌 높이(한 단)
+    const RIM = 16; // 가장자리 벽돌 테두리 두께
+    const BRICKS = ["#a85a31", "#8f4a28", "#b5693c"]; // 붉은 벽돌 색 변주
+
+    // 1) 구덩이 안쪽(빈 공간) — 아래로 갈수록 캄캄한 갱도
+    const hole = c.createLinearGradient(0, topY, 0, botY);
+    hole.addColorStop(0, "#1a1008");
+    hole.addColorStop(0.5, "#0a0603");
+    hole.addColorStop(1, "#000");
+    c.fillStyle = hole;
+    c.fillRect(f.x, topY, f.w, f.d);
+    // 입구 안쪽 턱 그림자(가운데 구멍만)
+    const lip = c.createLinearGradient(0, topY, 0, topY + 16);
+    lip.addColorStop(0, "rgba(0,0,0,0.6)");
+    lip.addColorStop(1, "rgba(0,0,0,0)");
+    c.fillStyle = lip;
+    c.fillRect(f.x + RIM, topY, f.w - RIM * 2, 16);
+
+    // 벽돌 한 장(윗면 하이라이트 + 아랫면 그림자)
+    const brick = (x0: number, y0: number, w: number, h: number, tone: number) => {
+      if (w <= 0) return;
+      c.fillStyle = BRICKS[((tone % 3) + 3) % 3];
+      c.fillRect(x0, y0, w, h);
+      c.fillStyle = "rgba(255,221,180,0.18)";
+      c.fillRect(x0, y0, w, 2);
+      c.fillStyle = "rgba(0,0,0,0.25)";
+      c.fillRect(x0, y0 + h - 1, w, 1);
+    };
+
+    // 2) 좌·우 가장자리 벽돌 기둥(세로로 쌓기) — 줄눈(모르타르) 바탕 위에
+    c.fillStyle = "#2e2016";
+    c.fillRect(f.x, topY, RIM, f.d);
+    c.fillRect(f.x + f.w - RIM, topY, RIM, f.d);
+    let row = 0;
+    for (let y = topY; y < botY; y += BH, row++) {
+      brick(f.x + 1, y + 1, RIM - 2, BH - 2, row); // 왼쪽 기둥
+      brick(f.x + f.w - RIM + 1, y + 1, RIM - 2, BH - 2, row + 1); // 오른쪽 기둥
+    }
+
+    // 3) 깊이감 — 전체에 아래로 갈수록 어둠(벽돌도 아래쪽은 어둑)
+    const depth = c.createLinearGradient(0, topY, 0, botY);
+    depth.addColorStop(0, "rgba(0,0,0,0)");
+    depth.addColorStop(0.55, "rgba(0,0,0,0.3)");
+    depth.addColorStop(1, "rgba(0,0,0,0.85)");
+    c.fillStyle = depth;
+    c.fillRect(f.x, topY, f.w, f.d);
+    // 벽돌 기둥 안쪽 모서리 그림자(구멍이 움푹 들어가 보이게)
+    c.fillStyle = "rgba(0,0,0,0.3)";
+    c.fillRect(f.x + RIM, topY, 3, f.d);
+    c.fillRect(f.x + f.w - RIM - 3, topY, 3, f.d);
+
+    // 4) 상단 코핑(테두리 윗단 벽돌 한 줄) — 가장자리 벽돌 마감
+    c.fillStyle = "#2e2016";
+    c.fillRect(f.x - 2, topY - 6, f.w + 4, 7);
+    for (let bx = f.x - 2, i = 0; bx < f.x + f.w + 2; bx += 20, i++) {
+      const w = Math.min(18, f.x + f.w + 2 - bx - 1);
+      brick(bx + 1, topY - 5, w, 5, i);
+    }
+
+    // 5) 좌우 가장자리 풀
+    c.fillStyle = "#6f8a3f";
+    for (const ex of [f.x, f.x + f.w]) {
+      for (let k = -1; k <= 1; k++) {
+        const gx = ex + k * 5;
+        c.beginPath();
+        c.moveTo(gx - 2, topY - 5);
+        c.quadraticCurveTo(gx, topY - 15, gx + 1, topY - 4);
+        c.quadraticCurveTo(gx + 2, topY - 11, gx + 4, topY - 5);
+        c.closePath();
+        c.fill();
+      }
+    }
+  } else {
+    // 구름다리(올라갔다 내려오는 나무 다리)
+    const g = c.createLinearGradient(0, GROUND_Y - f.d, 0, GROUND_Y);
+    g.addColorStop(0, "#a6794a");
+    g.addColorStop(1, "#6b4423");
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(f.x, GROUND_Y);
+    for (const [x, y] of pts) c.lineTo(x, y);
+    c.lineTo(f.x + f.w, GROUND_Y);
+    c.closePath();
+    c.fill();
+    // 지지 기둥
+    c.strokeStyle = "#5e3f1f";
+    c.lineWidth = 3;
+    for (let i = 2; i < N - 1; i += 3) {
+      const [x, y] = pts[i];
+      c.beginPath();
+      c.moveTo(x, y);
+      c.lineTo(x, GROUND_Y);
+      c.stroke();
+    }
+    // 널빤지 윗면
+    c.strokeStyle = "#7a5230";
+    c.lineWidth = 7;
+    c.lineCap = "round";
+    c.beginPath();
+    pts.forEach(([x, y], i) => (i ? c.lineTo(x, y - 3) : c.moveTo(x, y - 3)));
+    c.stroke();
+    c.strokeStyle = "#a9814c";
+    c.lineWidth = 2;
+    c.beginPath();
+    pts.forEach(([x, y], i) => (i ? c.lineTo(x, y - 5) : c.moveTo(x, y - 5)));
+    c.stroke();
+    // 사다리 가로대(양쪽 경사 구간)
+    c.strokeStyle = "#6b4423";
+    c.lineWidth = 2;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      if ((t > 0.04 && t < 0.28) || (t > 0.72 && t < 0.96)) {
+        const [x, y] = pts[i];
+        c.beginPath();
+        c.moveTo(x - 7, y + 6);
+        c.lineTo(x + 7, y + 6);
+        c.stroke();
+      }
+    }
+    c.lineCap = "butt";
+  }
+}
 
 // 장애물
 //  육지: 웅덩이 puddle(빠지면 느려짐) · 작은산 mound · 통나무 log · 가시덤불 thorns(밟으면 아픔) · 그루터기 stump
@@ -94,6 +425,8 @@ for (let x = 380; x < GOAL - 300; x += 330) {
   if (x < 360) continue;
   if (GATES.some((g) => Math.abs(g - x) < 115)) continue;
   if (PLATFORMS.some((p) => x > p.x - 55 && x < p.x + p.w + 55)) continue;
+  // 지형(구덩이·구름다리) 위에는 장애물을 두지 않는다
+  if (TERRAIN.some((f) => x > f.x - 60 && x < f.x + f.w + 60)) continue;
   // 구간 경계(숲↔바다) 주변은 비워서 전환이 항상 뚫리게 한다
   if (Math.abs(x - SEA_START) < 230 || Math.abs(x - SEA_END) < 230) continue;
   const inSea = x >= SEA_START && x < SEA_END;
@@ -103,13 +436,7 @@ for (let x = 380; x < GOAL - 300; x += 330) {
   OB_DEFS.push({ x, type });
 }
 
-type Phase = "intro" | "running" | "quiz" | "feedback" | "win" | "lose";
-
-interface Feedback {
-  correct: boolean;
-  answerText: string;
-  explain: string;
-}
+type Phase = "intro" | "running" | "quiz" | "win" | "lose";
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -254,9 +581,12 @@ export default function GamePage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<Phase>("intro");
   const [quiz, setQuiz] = useState<QuizItem | null>(null);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [quizWrong, setQuizWrong] = useState<number[]>([]); // 이번 문제에서 틀린 보기
   const [fs, setFs] = useState(false);
+  const [muted, setMuted] = useState(false);
 
+  const musicRef = useRef<GameMusic | null>(null);
+  const wasInPuddle = useRef(false);
   const phaseRef = useRef<Phase>("intro");
   const keys = useRef<Record<string, boolean>>({});
   const player = useRef({ x: 40, y: GROUND_Y - PH, vx: 0, vy: 0, onGround: true, face: 1, anim: 0 });
@@ -272,6 +602,9 @@ export default function GamePage() {
   const sparkles = useRef<{ x: number; y: number; vx: number; vy: number; life: number }[]>([]);
   const splash = useRef<{ x: number; y: number; vx: number; vy: number; life: number }[]>([]);
   const splashText = useRef(0);
+  const toastText = useRef(""); // 화면 중앙 잠깐 뜨는 안내
+  const toastTimer = useRef(0);
+  const toastColor = useRef("#c0392b");
   const gates = useRef(GATES.map((x) => ({ x, asked: false })));
   const quizOrder = useRef<QuizItem[]>([]);
   const gateCount = useRef(0);
@@ -285,8 +618,7 @@ export default function GamePage() {
   const speedRef = useRef<HTMLSpanElement>(null);
 
   // ===== 퀴즈에서 얻은 아이템 ↔ 게임 연계 =====
-  const [earned, setEarned] = useState<ItemId[]>([]);
-  const [equipped, setEquipped] = useState<ItemId[]>([]);
+  const [equipped] = useState<ItemId[]>([]);
   const equippedRef = useRef<ItemId[]>([]);
   const jumpMul = useRef(1);
   const accelMul = useRef(1);
@@ -299,10 +631,6 @@ export default function GamePage() {
   const bgImgs = useRef<(HTMLImageElement | null)[]>([null, null, null]);
 
   useEffect(() => {
-    setEarned(getEarnedItems());
-  }, []);
-
-  useEffect(() => {
     let alive = true;
     const load = (src: string) =>
       new Promise<HTMLImageElement | null>((res) => {
@@ -312,20 +640,26 @@ export default function GamePage() {
         im.src = src;
       });
     (async () => {
-      const [r, t, b1, b2, b3] = await Promise.all([
+      const [r, t, b1, b2, b3, pit, log, rock] = await Promise.all([
         load("/assets/char/tokki.webp"),
         load("/assets/char/jara.webp"),
         load("/assets/game/bg1-palace.webp"),
         load("/assets/game/bg2-forest.webp"),
         load("/assets/game/bg3-coast.webp"),
+        load("/assets/game/pit-source.webp"),
+        load("/assets/game/log.webp"),
+        load("/assets/game/rock.webp"),
       ]);
       if (!alive) return;
       bgImgs.current = [b1, b2, b3];
       try {
         if (r) rabbitImg.current = processSprite(r);
         if (t) turtleImg.current = processSprite(t);
+        if (pit) PIT_IMG = bakePitSprite(pit);
+        if (log) LOG_IMG = bakeLogSprite(log);
+        if (rock) ROCK_IMG = bakeRockSprite(rock);
       } catch {
-        /* 가공 실패 시 기존 벡터 캐릭터로 폴백 */
+        /* 가공 실패 시 기존 벡터 캐릭터/구덩이/통나무/바위로 폴백 */
       }
     })();
     return () => {
@@ -336,14 +670,10 @@ export default function GamePage() {
     equippedRef.current = equipped;
   }, [equipped]);
 
-  const toggleEquip = (id: ItemId) =>
-    setEquipped((cur) =>
-      cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
-    );
-
   const resetGame = useCallback(() => {
     player.current = { x: 40, y: GROUND_Y - PH, vx: 0, vy: 0, onGround: true, face: 1, anim: 0 };
     prevX.current = 40;
+    wasInPuddle.current = false;
     turtleX.current = 60;
     turtleMul.current = 1;
     speedMul.current = 1;
@@ -372,6 +702,7 @@ export default function GamePage() {
     sparkles.current = [];
     splash.current = [];
     splashText.current = 0;
+    toastTimer.current = 0;
     gates.current = GATES.map((x) => ({ x, asked: false }));
     quizOrder.current = shuffle(QUIZ).map(shuffleOptions);
     gateCount.current = 0;
@@ -382,9 +713,10 @@ export default function GamePage() {
     resetGame();
     gameSessionRef.current = newLogId();
     setQuiz(null);
-    setFeedback(null);
+    setQuizWrong([]);
     phaseRef.current = "running";
     setPhase("running");
+    musicRef.current?.start(); // 사용자 제스처(출발) 이후 → 자동재생 정책 통과
   }, [resetGame]);
 
   const answerQuiz = useCallback(
@@ -407,27 +739,55 @@ export default function GamePage() {
           },
         },
       ]);
+      const p = player.current;
+      const resumeRun = () => {
+        setQuiz(null);
+        setQuizWrong([]);
+        phaseRef.current = "running";
+        setPhase("running");
+      };
       if (correct) {
-        // 토끼만 살짝 빨라짐 — 자라는 건드리지 않는다
+        // 정답 → 토끼 살짝 빨라짐, "맞았어요!" 띄우고 바로 진행
         speedMul.current *= 1.06;
-      } else {
-        // 자라가 점점 빨라져서 아슬아슬해진다
+        toastText.current = "맞았어요!";
+        toastColor.current = "#2e7d32";
+        toastTimer.current = 80;
+        for (let i = 0; i < 12; i++)
+          sparkles.current.push({
+            x: p.x + PW / 2,
+            y: p.y + PH / 2,
+            vx: (Math.random() - 0.5) * 3.5,
+            vy: -Math.random() * 3 - 1,
+            life: 28,
+          });
+        resumeRun();
+        return;
+      }
+      // 오답
+      const nextWrong = quizWrong.includes(idx) ? quizWrong : [...quizWrong, idx];
+      if (nextWrong.length >= 2) {
+        // 2번째도 오답 → "또 틀렸네요." 잠깐 띄우고 바로 진행
         turtleMul.current *= 1.14;
         slowTimer.current = 110;
+        toastText.current = "또 틀렸네요.";
+        toastColor.current = "#c0392b";
+        toastTimer.current = 80;
+        for (let i = 0; i < 8; i++)
+          splash.current.push({
+            x: p.x + PW / 2,
+            y: p.y + PH,
+            vx: (Math.random() - 0.5) * 3,
+            vy: -Math.random() * 3 - 1,
+            life: 30,
+          });
+        resumeRun();
+      } else {
+        // 1번째 오답 → "다시 하세요" (같은 문제 다시 풀기)
+        setQuizWrong(nextWrong);
       }
-      setFeedback({ correct, answerText: item.options[item.answer], explain: item.explain });
-      phaseRef.current = "feedback";
-      setPhase("feedback");
     },
-    [quiz],
+    [quiz, quizWrong],
   );
-
-  const resume = useCallback(() => {
-    setFeedback(null);
-    setQuiz(null);
-    phaseRef.current = "running";
-    setPhase("running");
-  }, []);
 
   const toggleFullscreen = useCallback(() => {
     const el = stageRef.current;
@@ -442,9 +802,43 @@ export default function GamePage() {
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
+  // 배경음악 엔진 준비(+ 음소거 설정 복원)
+  useEffect(() => {
+    const m = new GameMusic();
+    musicRef.current = m;
+    let saved = false;
+    try {
+      saved = localStorage.getItem("rabbit.game.muted") === "1";
+    } catch {
+      /* localStorage 접근 불가 시 무시 */
+    }
+    if (saved) {
+      setMuted(true);
+      m.setMuted(true);
+    }
+    return () => {
+      m.dispose();
+      musicRef.current = null;
+    };
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    setMuted((prev) => {
+      const next = !prev;
+      musicRef.current?.setMuted(next);
+      try {
+        localStorage.setItem("rabbit.game.muted", next ? "1" : "0");
+      } catch {
+        /* 무시 */
+      }
+      return next;
+    });
+  }, []);
+
   // 게임 결과(완주/실패) 기록
   useEffect(() => {
     if (phase === "win" || phase === "lose") {
+      musicRef.current?.stop(); // 결과 화면에서는 음악 정지(다시 시작 시 재생)
       sendLog([
         {
           feature: "game",
@@ -467,7 +861,6 @@ export default function GamePage() {
       if (k === "Enter") {
         const p = phaseRef.current;
         if (p === "intro" || p === "win" || p === "lose") startGame();
-        else if (p === "feedback") resume();
         return;
       }
       keys.current[k] = true;
@@ -481,7 +874,7 @@ export default function GamePage() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [startGame, resume]);
+  }, [startGame]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -535,8 +928,14 @@ export default function GamePage() {
           }
       const slowed = slowTimer.current > 0 && !slowImmune.current;
       const hazardSlow = inHazard && !slowImmune.current;
+      // 공중에서는 수평 속도를 줄여 점프 비거리를 짧게 한다(점프 높이는 그대로).
+      const airFactor = p.onGround ? 1 : 0.72;
       const maxRun =
-        RUN * speedMul.current * (slowed ? 0.5 : 1) * (hazardSlow ? 0.5 : 1);
+        RUN *
+        speedMul.current *
+        (slowed ? 0.5 : 1) *
+        (hazardSlow ? 0.5 : 1) *
+        airFactor;
       const acc = ACCEL * accelMul.current;
       if (right && !left) {
         p.vx = Math.min(maxRun, p.vx + acc);
@@ -551,6 +950,7 @@ export default function GamePage() {
       if (jump && p.onGround) {
         p.vy = jumpV;
         p.onGround = false;
+        musicRef.current?.sfxJump(); // 점프 효과음
       }
 
       p.vy += grav;
@@ -564,14 +964,37 @@ export default function GamePage() {
         const otop = GROUND_Y - OB_H[o.type];
         if (newX + PW > o.x && p.x < o.x + ow && p.y + PH > otop + 6) newX = o.x - PW;
       }
+      // 공중 얇은 단: 몸이 단 높이와 겹치면 옆에서 막힌다 → 점프해서 넘어가야 함
+      for (const pl of PLATFORMS) {
+        if (
+          newX + PW > pl.x &&
+          p.x < pl.x + pl.w &&
+          p.y + PH > pl.y &&
+          p.y < pl.y + PLAT_THICK
+        )
+          newX = pl.x - PW;
+      }
+      // 구덩이 벽: 구덩이 안(지면 아래)에서는 벽에 막혀 점프로만 탈출
+      for (const f of TERRAIN) {
+        if (f.type !== "pit") continue;
+        if (p.y + PH > GROUND_Y + 2) {
+          if (p.x + PW <= f.x + f.w && newX + PW > f.x + f.w)
+            newX = f.x + f.w - PW;
+          if (p.x >= f.x && newX < f.x) newX = f.x;
+        }
+      }
       p.x = Math.max(8, Math.min(GOAL + 40, newX));
       if (inPuddle && tRef.current % 6 === 0) spawnSplash(footX0, false);
+      // 웅덩이에 '빠지는 순간'(처음 발이 닿을 때) 첨벙 효과음
+      if (inPuddle && !wasInPuddle.current) musicRef.current?.sfxSplash();
+      wasInPuddle.current = inPuddle;
 
       const prevBottom = p.y + PH;
       p.y += p.vy;
       p.onGround = false;
-      if (p.y >= GROUND_Y - PH) {
-        p.y = GROUND_Y - PH;
+      const groundLevel = groundAt(p.x + PW / 2); // 지형(구덩이·구름다리) 반영
+      if (p.y >= groundLevel - PH) {
+        p.y = groundLevel - PH;
         p.vy = 0;
         p.onGround = true;
       }
@@ -629,9 +1052,13 @@ export default function GamePage() {
       if (slowTimer.current > 0) slowTimer.current -= 1;
 
       // 풍덩
-      if (prevX.current < SEA_START && p.x >= SEA_START) spawnSplash(SEA_START, true);
+      if (prevX.current < SEA_START && p.x >= SEA_START) {
+        spawnSplash(SEA_START, true);
+        musicRef.current?.sfxSplash(true); // 풍덩! 큰 첨벙 효과음
+      }
       if (prevX.current < SEA_END && p.x >= SEA_END) spawnSplash(SEA_END, false);
       if (splashText.current > 0) splashText.current -= 1;
+      if (toastTimer.current > 0) toastTimer.current -= 1;
       splash.current = splash.current.filter((s) => s.life > 0);
       for (const s of splash.current) {
         s.x += s.vx;
@@ -673,6 +1100,7 @@ export default function GamePage() {
           const item = quizOrder.current[gateCount.current % quizOrder.current.length];
           gateCount.current += 1;
           setQuiz(item);
+          setQuizWrong([]);
           phaseRef.current = "quiz";
           setPhase("quiz");
           return;
@@ -791,13 +1219,29 @@ export default function GamePage() {
         ctx.fill();
       }
 
-      // 발판 + 반딧불
+      // 지형(지하 구덩이 · 구름다리)
+      for (const f of TERRAIN) {
+        if (f.x + f.w - cam < -30 || f.x - cam > VW + 30) continue;
+        drawTerrain(ctx, f);
+      }
+
+      // 공중 얇은 단(허들) + 반딧불
       for (const pl of PLATFORMS) {
         if (pl.x - cam < -140 || pl.x - cam > VW + 20) continue;
-        ctx.fillStyle = "rgba(60,50,30,0.55)";
-        ctx.fillRect(pl.x, pl.y, pl.w, 10);
+        // 바닥 그림자
+        ctx.fillStyle = "rgba(0,0,0,0.12)";
+        ctx.beginPath();
+        ctx.ellipse(pl.x + pl.w / 2, GROUND_Y + 2, pl.w * 0.45, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 얇은 단(공중에 떠 있음)
+        ctx.fillStyle = "#6b4a2c";
+        ctx.beginPath();
+        ctx.roundRect(pl.x, pl.y, pl.w, PLAT_THICK, 5);
+        ctx.fill();
         ctx.fillStyle = "#8a9a5b";
         ctx.fillRect(pl.x, pl.y, pl.w, 4);
+        ctx.fillStyle = "#a7bd6b";
+        ctx.fillRect(pl.x, pl.y, pl.w, 2);
       }
       for (const f of fireflies.current) {
         if (f.taken) continue;
@@ -839,7 +1283,7 @@ export default function GamePage() {
 
       drawGoal(ctx, GOAL);
       if (turtleImg.current)
-        drawSprite(ctx, turtleImg.current, turtleX.current, GROUND_Y, true, 64);
+        drawSprite(ctx, turtleImg.current, turtleX.current, Math.min(GROUND_Y, groundAt(turtleX.current)), true, 64);
       else drawTurtleMan(ctx, turtleX.current, t, 0);
       drawEquip(ctx, player.current);
       if (rabbitImg.current)
@@ -861,6 +1305,19 @@ export default function GamePage() {
         ctx.textAlign = "center";
         ctx.fillText("풍덩! 🌊", VW / 2, 130);
         ctx.textAlign = "left";
+      }
+
+      if (toastTimer.current > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, toastTimer.current / 25);
+        ctx.textAlign = "center";
+        ctx.font = "bold 30px system-ui, 'Malgun Gothic'";
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.strokeText(toastText.current, VW / 2, 120);
+        ctx.fillStyle = toastColor.current;
+        ctx.fillText(toastText.current, VW / 2, 120);
+        ctx.restore();
       }
 
       ctx.fillStyle = "rgba(43,43,43,0.7)";
@@ -1094,24 +1551,31 @@ export default function GamePage() {
       c.ellipse(o.x + w / 2, GROUND_Y - h + 7, w / 2 - 5, 5, 0, 0, Math.PI * 2);
       c.fill();
     } else if (o.type === "log") {
-      // 쓰러진 통나무 (넘거나 올라타기)
-      const top = GROUND_Y - h;
-      const g = c.createLinearGradient(0, top, 0, GROUND_Y);
-      g.addColorStop(0, "#b4824c");
-      g.addColorStop(1, "#7a5329");
-      c.fillStyle = g;
-      c.beginPath();
-      c.roundRect(o.x, top, w, h, h / 2);
-      c.fill();
-      c.strokeStyle = "#5e3f1f";
-      c.lineWidth = 1.5;
-      c.beginPath();
-      c.ellipse(o.x + 11, top + h / 2, 5, h / 2 - 2, 0, 0, Math.PI * 2);
-      c.stroke();
-      c.fillStyle = "#cd9a5f";
-      c.beginPath();
-      c.ellipse(o.x + 11, top + h / 2, 2.4, h / 2 - 6, 0, 0, Math.PI * 2);
-      c.fill();
+      // 쓰러진 통나무 — 고목 그림이 준비되면 그걸로(충돌 박스보다 살짝 넓게·지면에 맞춤)
+      if (LOG_IMG) {
+        const DW = w * 1.3;
+        const DH = DW * (LOG_IMG.height / LOG_IMG.width);
+        c.drawImage(LOG_IMG, o.x + w / 2 - DW / 2, GROUND_Y - DH, DW, DH);
+      } else {
+        // (폴백) 벡터 통나무
+        const top = GROUND_Y - h;
+        const g = c.createLinearGradient(0, top, 0, GROUND_Y);
+        g.addColorStop(0, "#b4824c");
+        g.addColorStop(1, "#7a5329");
+        c.fillStyle = g;
+        c.beginPath();
+        c.roundRect(o.x, top, w, h, h / 2);
+        c.fill();
+        c.strokeStyle = "#5e3f1f";
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.ellipse(o.x + 11, top + h / 2, 5, h / 2 - 2, 0, 0, Math.PI * 2);
+        c.stroke();
+        c.fillStyle = "#cd9a5f";
+        c.beginPath();
+        c.ellipse(o.x + 11, top + h / 2, 2.4, h / 2 - 6, 0, 0, Math.PI * 2);
+        c.fill();
+      }
     } else if (o.type === "stump") {
       // 나무 그루터기 (높아서 더 높이 점프)
       const top = GROUND_Y - h;
@@ -1206,20 +1670,27 @@ export default function GamePage() {
       c.ellipse(cx, cy, r, r * 0.8, 0, 0, Math.PI * 2);
       c.fill();
     } else {
-      // rock
-      const g = c.createLinearGradient(0, GROUND_Y - h, 0, GROUND_Y);
-      g.addColorStop(0, "#aab0b6");
-      g.addColorStop(1, "#5b6065");
-      c.fillStyle = g;
-      c.strokeStyle = "#44484c";
-      c.lineWidth = 1.5;
-      c.beginPath();
-      c.moveTo(o.x, GROUND_Y);
-      c.quadraticCurveTo(o.x + w * 0.18, GROUND_Y - h, o.x + w * 0.5, GROUND_Y - h);
-      c.quadraticCurveTo(o.x + w * 0.82, GROUND_Y - h, o.x + w, GROUND_Y);
-      c.closePath();
-      c.fill();
-      c.stroke();
+      // rock — 바위 그림이 준비되면 그걸로(충돌 박스보다 살짝 넓게·지면에 맞춤)
+      if (ROCK_IMG) {
+        const DW = w * 1.5;
+        const DH = DW * (ROCK_IMG.height / ROCK_IMG.width);
+        c.drawImage(ROCK_IMG, o.x + w / 2 - DW / 2, GROUND_Y - DH, DW, DH);
+      } else {
+        // (폴백) 벡터 바위
+        const g = c.createLinearGradient(0, GROUND_Y - h, 0, GROUND_Y);
+        g.addColorStop(0, "#aab0b6");
+        g.addColorStop(1, "#5b6065");
+        c.fillStyle = g;
+        c.strokeStyle = "#44484c";
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.moveTo(o.x, GROUND_Y);
+        c.quadraticCurveTo(o.x + w * 0.18, GROUND_Y - h, o.x + w * 0.5, GROUND_Y - h);
+        c.quadraticCurveTo(o.x + w * 0.82, GROUND_Y - h, o.x + w, GROUND_Y);
+        c.closePath();
+        c.fill();
+        c.stroke();
+      }
     }
   }
 
@@ -1530,6 +2001,13 @@ export default function GamePage() {
           ← 홈
         </a>
         <span className="chat-title">🏁 토끼 vs 자라 경주</span>
+        <button
+          className="fs-btn"
+          onClick={toggleMute}
+          title={muted ? "소리 켜기" : "소리 끄기"}
+        >
+          {muted ? "🔇 소리" : "🔊 소리"}
+        </button>
         <button className="fs-btn" onClick={toggleFullscreen} title="전체화면">
           {fs ? "⛶ 창모드" : "⛶ 전체화면"}
         </button>
@@ -1555,48 +2033,17 @@ export default function GamePage() {
 
         {phase === "intro" && (
           <div className="game-overlay">
-            <div className="game-panel">
-              <h2>🏁 토끼 vs 자라 경주</h2>
-              <p className="game-controls">
-                ✅ 정답 → <b>내 속도 UP</b> 🐰💨
-                <br />❌ 오답 → <b>자라 속도 UP</b>
+            <div className="game-panel intro-panel">
+              <h2 className="intro-title">토끼 vs 자라 경주</h2>
+              <p className="intro-line">
+                ⭕ 정답 → <b>내 속도 UP</b> 🐰
+                <br />❌ 오답 → <b>자라 속도 UP</b> 🐢
               </p>
-              <p className="game-controls">← → 걷기 · <b>Space(또는 ↑) 점프</b></p>
+              <p className="intro-line intro-controls">
+                ← → 걷기 · <b>Space(또는 ↑) 점프</b>
+              </p>
 
-              <div className="game-items">
-                <p className="game-items-lead">
-                  🎒 아이템 장착
-                  {earned.length === 0 && (
-                    <span className="game-items-hint">
-                      {" "}
-                      — 🧩 퀴즈 보물상자에서 아이템을 모아 보세요!
-                    </span>
-                  )}
-                </p>
-                <div className="game-items-row">
-                  {ITEMS.map((it) => {
-                    const owned = earned.includes(it.id);
-                    const on = equipped.includes(it.id);
-                    return (
-                      <button
-                        key={it.id}
-                        className={`game-item ${owned ? "" : "locked"} ${on ? "on" : ""}`}
-                        onClick={() => owned && toggleEquip(it.id)}
-                        disabled={!owned}
-                        title={owned ? it.desc : "퀴즈에서 획득"}
-                      >
-                        <span className="game-item-icon">{it.icon}</span>
-                        <span className="game-item-name">{it.name}</span>
-                        <span className="game-item-desc">
-                          {owned ? it.desc : "퀴즈에서 획득"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button className="btn" onClick={startGame}>
+              <button className="btn intro-start" onClick={startGame}>
                 출발! ▶
               </button>
             </div>
@@ -1609,31 +2056,23 @@ export default function GamePage() {
               <span className="dialog-tag">❓ 중요한 질문</span>
               <h3 className="quiz-q">{quiz.q}</h3>
               <div className="quiz-opts">
-                {quiz.options.map((op, i) => (
-                  <button key={i} className="quiz-opt" onClick={() => answerQuiz(i)}>
-                    {op}
-                  </button>
-                ))}
+                {quiz.options.map((op, i) => {
+                  const wrong = quizWrong.includes(i);
+                  return (
+                    <button
+                      key={i}
+                      className={`quiz-opt ${wrong ? "wrong" : ""}`}
+                      onClick={() => answerQuiz(i)}
+                      disabled={wrong}
+                    >
+                      {op}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          </div>
-        )}
-
-        {phase === "feedback" && feedback && (
-          <div className="game-overlay">
-            <div className={`game-panel feedback ${feedback.correct ? "ok" : "no"}`}>
-              <h2>
-                {feedback.correct ? "✅ 정답! 내 속도 UP 🐰💨" : "❌ 아쉬워요… 자라가 빨라져요! 🐢💨"}
-              </h2>
-              {!feedback.correct && (
-                <p className="game-controls">
-                  정답: <b>{feedback.answerText}</b> · 자라 속도 UP — 아슬아슬!
-                </p>
+              {quizWrong.length > 0 && (
+                <p className="quiz-retry">앗, 틀렸어요. 다시 골라 보세요! 🙂</p>
               )}
-              <p>{feedback.explain}</p>
-              <button className="btn" onClick={resume}>
-                계속 달리기 ▶ <span className="hint">(Enter)</span>
-              </button>
             </div>
           </div>
         )}

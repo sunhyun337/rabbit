@@ -1,4 +1,3 @@
-import StorySynopsis from "@/app/components/StorySynopsis";
 import { hasSupabaseEnv } from "@/lib/supabase/server";
 import { getViewer } from "@/lib/auth/viewer";
 
@@ -51,15 +50,11 @@ export default async function Home() {
               </div>
 
               <div className="home-btns">
-                <StorySynopsis label="📖 줄거리" className="btn big" />
                 <a className="btn big" href="/practice">
-                  🗣️ 말하기 연습
-                </a>
-                <a className="btn big" href="/quiz">
-                  🧩 퀴즈
+                  📖 줄거리 &amp; 말하기 연습
                 </a>
                 <a className="btn big" href="/game">
-                  🎮 게임
+                  🧩 퀴즈 &amp; 게임
                 </a>
                 <a className="btn big" href="/remix">
                   ✨ 이야기 바꾸기
