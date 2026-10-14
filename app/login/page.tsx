@@ -78,7 +78,11 @@ function LoginInner() {
         }
       }
     } catch (e) {
-      const raw = e instanceof Error ? e.message : "";
+      // Supabase 오류는 message뿐 아니라 code(예: invalid_credentials)도 함께 본다
+      const ae = e as { message?: unknown; code?: unknown };
+      const raw = [ae?.code, ae?.message]
+        .map((v) => (typeof v === "string" ? v : ""))
+        .join(" ");
       setErr(translateError(raw));
     } finally {
       setBusy(false);
@@ -179,10 +183,26 @@ function LoginInner() {
 }
 
 function translateError(raw: string): string {
-  const s = raw.toLowerCase();
-  if (s.includes("invalid login")) return "아이디 또는 비밀번호가 올바르지 않아요.";
-  if (s.includes("already registered") || s.includes("already been registered"))
+  // 밑줄을 공백으로 바꿔 code(invalid_credentials)와 message(Invalid login credentials)를 함께 매칭
+  const s = raw.toLowerCase().replace(/_/g, " ");
+  if (s.includes("invalid login") || s.includes("invalid credentials"))
+    return "아이디 또는 비밀번호가 올바르지 않아요.";
+  if (s.includes("email not confirmed") || s.includes("not confirmed"))
+    return "이메일 확인이 필요해요. 가입 때 받은 확인 메일의 링크를 눌러 주세요.";
+  if (
+    s.includes("already registered") ||
+    s.includes("already been registered") ||
+    s.includes("user already exists")
+  )
     return "이미 가입된 이메일이에요. 로그인해 주세요.";
+  if (s.includes("invalid api key") || s.includes("api key"))
+    return "인증 설정에 문제가 있어요. (관리자에게 문의해 주세요.)";
+  if (
+    s.includes("rate limit") ||
+    s.includes("too many") ||
+    s.includes("over request")
+  )
+    return "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.";
   if (s.includes("password")) return "비밀번호를 확인해 주세요. (6자 이상)";
   if (s.includes("email")) return "이메일 주소를 확인해 주세요.";
   return "잠시 후 다시 시도해 주세요.";
