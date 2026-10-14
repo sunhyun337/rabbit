@@ -1,5 +1,5 @@
 import { createClient as createJsClient, type SupabaseClient } from "@supabase/supabase-js";
-import { cleanEnv } from "./env";
+import { cleanEnv, SUPABASE_URL } from "./env";
 
 /** 서비스롤(service_role) 환경변수가 설정됐는지 — 교사 대시보드/연구 데이터 조회에 필요. */
 export function hasAdminEnv(): boolean {
@@ -15,7 +15,7 @@ export function hasAdminEnv(): boolean {
  */
 export function createAdminClient(): SupabaseClient {
   return createJsClient(
-    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
+    SUPABASE_URL,
     cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY),
     { auth: { persistSession: false, autoRefreshToken: false } },
   );

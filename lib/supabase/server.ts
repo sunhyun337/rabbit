@@ -1,16 +1,13 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { cleanEnv } from "./env";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, hasSupabaseConfig } from "./env";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 /** 서버 컴포넌트/라우트용 Supabase 클라이언트. (Next 15: cookies()는 async) */
 export async function createClient() {
   const cookieStore = await cookies();
-  return createServerClient(
-    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL),
-    cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-    {
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -29,10 +26,7 @@ export async function createClient() {
   );
 }
 
-/** 서버에서 Supabase 환경변수가 설정됐는지 확인. */
+/** 서버에서 Supabase 설정이 준비됐는지 확인(공개 기본값 포함). */
 export function hasSupabaseEnv(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
+  return hasSupabaseConfig;
 }
