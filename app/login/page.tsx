@@ -19,6 +19,7 @@ function LoginInner() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,6 +32,10 @@ function LoginInner() {
     }
     if (!email.trim() || password.length < 6) {
       setErr("아이디(이메일)를 입력하고 비밀번호는 6자 이상으로 해 주세요.");
+      return;
+    }
+    if (mode === "signup" && !privacyConsent) {
+      setErr("개인정보 수집·이용 및 처리방침에 동의해야 가입할 수 있어요.");
       return;
     }
     if (mode === "signup" && !consent) {
@@ -53,29 +58,25 @@ function LoginInner() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: {
-            emailRedirectTo:
-              typeof window !== "undefined"
-                ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-                : undefined,
-          },
         });
         if (error) throw error;
-        if (data.session) {
-          // 이메일 확인이 꺼져 있으면 바로 로그인됨 → 연구 동의 기록
-          try {
-            await fetch("/api/consent", { method: "POST" });
-          } catch {
-            /* 동의 기록 실패는 무시 */
-          }
-          router.push(next);
-          router.refresh();
-        } else {
-          setMsg(
-            "회원가입 신청이 접수됐어요. 이메일로 온 확인 링크를 눌러 가입을 완료해 주세요.",
-          );
-          setMode("login");
+        // 이메일 승인을 사용하지 않으므로 가입 즉시 로그인된다.
+        // 혹시 세션이 없으면(설정 반영 지연 등) 비밀번호로 바로 로그인한다.
+        if (!data.session) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
+          if (signInError) throw signInError;
         }
+        // 연구 데이터 활용 동의 기록
+        try {
+          await fetch("/api/consent", { method: "POST" });
+        } catch {
+          /* 동의 기록 실패는 무시 */
+        }
+        router.push(next);
+        router.refresh();
       }
     } catch (e) {
       // Supabase 오류는 message뿐 아니라 code(예: invalid_credentials)도 함께 본다
@@ -157,17 +158,32 @@ function LoginInner() {
           </label>
 
           {mode === "signup" && (
-            <label className="auth-consent">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-              />
-              <span>
-                학습 과정에서 입력한 대화·퀴즈·게임 기록이 <b>익명으로 교육 연구에
-                활용</b>되는 것에 동의합니다. (언제든 문의해 삭제를 요청할 수 있어요.)
-              </span>
-            </label>
+            <>
+              <label className="auth-consent">
+                <input
+                  type="checkbox"
+                  checked={privacyConsent}
+                  onChange={(e) => setPrivacyConsent(e.target.checked)}
+                />
+                <span>
+                  <b>개인정보 수집·이용 및 처리방침</b>에 동의합니다. (필수){" "}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                    처리방침 보기
+                  </a>
+                </span>
+              </label>
+              <label className="auth-consent">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                />
+                <span>
+                  학습 과정에서 입력한 대화·퀴즈·게임 기록이 <b>익명으로 교육 연구에
+                  활용</b>되는 것에 동의합니다. (언제든 문의해 삭제를 요청할 수 있어요.)
+                </span>
+              </label>
+            </>
           )}
 
           {err && <p className="auth-err">{err}</p>}
@@ -187,8 +203,6 @@ function translateError(raw: string): string {
   const s = raw.toLowerCase().replace(/_/g, " ");
   if (s.includes("invalid login") || s.includes("invalid credentials"))
     return "아이디 또는 비밀번호가 올바르지 않아요.";
-  if (s.includes("email not confirmed") || s.includes("not confirmed"))
-    return "이메일 확인이 필요해요. 가입 때 받은 확인 메일의 링크를 눌러 주세요.";
   if (
     s.includes("already registered") ||
     s.includes("already been registered") ||
@@ -204,7 +218,6 @@ function translateError(raw: string): string {
   )
     return "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.";
   if (s.includes("password")) return "비밀번호를 확인해 주세요. (6자 이상)";
-  if (s.includes("email")) return "이메일 주소를 확인해 주세요.";
   return "잠시 후 다시 시도해 주세요.";
 }
 

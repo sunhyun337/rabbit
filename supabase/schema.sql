@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   display_name text,
   role text not null default 'student' check (role in ('student', 'teacher')),
   research_consent boolean not null default false,
+  privacy_consent boolean not null default false,
   consent_at timestamptz,
   created_at timestamptz not null default now()
 );

@@ -4,7 +4,7 @@ import { createAdminClient, hasAdminEnv } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-/** 연구 데이터 활용 동의 기록. 회원가입 직후 클라이언트가 호출. */
+/** 연구 데이터 활용 + 개인정보 처리방침 동의 기록. 회원가입 직후 클라이언트가 호출. */
 export async function POST() {
   if (!hasSupabaseEnv()) return NextResponse.json({ ok: false });
   const supabase = await createClient();
@@ -21,6 +21,7 @@ export async function POST() {
           id: user.id,
           email: user.email,
           research_consent: true,
+          privacy_consent: true,
           consent_at: new Date().toISOString(),
         },
         { onConflict: "id" },
