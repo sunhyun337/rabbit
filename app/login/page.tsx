@@ -90,6 +90,26 @@ function LoginInner() {
     }
   }
 
+  // 교수님 점검용 테스트 계정 로그인(비밀번호는 서버에서만 처리 — 클라이언트에 노출 안 함)
+  async function onDemoLogin() {
+    setErr(null);
+    setMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/demo-login", { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data?.error || "테스트 로그인에 실패했어요.");
+      }
+      router.push(next);
+      router.refresh();
+    } catch (e) {
+      setErr((e as Error)?.message || "테스트 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="container auth">
       <a href="/" className="chat-back">
@@ -193,6 +213,27 @@ function LoginInner() {
             {busy ? "처리 중…" : mode === "login" ? "로그인" : "회원가입"}
           </button>
         </form>
+
+        {mode === "login" && (
+          <div className="auth-demo">
+            <p className="auth-demo-title">👩‍🏫 점검용 테스트 계정</p>
+            <p className="auth-demo-row">
+              아이디 <b>teacher.demo@gmail.com</b>
+            </p>
+            <p className="auth-demo-row">
+              비밀번호 <span className="auth-demo-mask">••••••••</span>{" "}
+              <small>(보안을 위해 가림)</small>
+            </p>
+            <button
+              className="btn auth-demo-btn"
+              type="button"
+              onClick={onDemoLogin}
+              disabled={busy}
+            >
+              {busy ? "처리 중…" : "테스트 계정으로 로그인"}
+            </button>
+          </div>
+        )}
       </div>
     </main>
   );
